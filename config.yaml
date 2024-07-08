@@ -1,0 +1,48 @@
+# This is a config file for the license plate recognition task
+img_size: &im [96, 192]
+time_steps: &ts 16
+
+# training config
+ckpt: ""
+batch_size: &bs 128
+blank_id: &bi -1
+lr: 1.5e-3
+warmup: 0
+epochs: 200
+eval_freq: 10
+
+# data config
+train:
+  batch_size: *bs
+  tfrecord: "/home/ubuntu/datasets/lpr/L16/train.tfrecord"
+  data_aug: True
+
+val:
+  batch_size: *bs
+  tfrecord: "/home/ubuntu/datasets/lpr/L16/val.tfrecord"
+  data_aug: False
+
+# model config
+model:
+  time_steps: *ts
+  n_class: &nc 68
+  n_feat: &nf 64
+
+# loss config
+ctc_loss:
+  weight: 2.0
+  blank_id: *bi
+
+focal_ctc_loss:
+  weight: 2.0
+  blank_id: *bi
+  alpha: 1.0
+  gamma: 0.5
+
+center_ctc_loss:
+  weight: 0.5
+  n_class: *nc
+  n_feat: *nf
+
+dice_bce_loss:
+  weight: 1.5
