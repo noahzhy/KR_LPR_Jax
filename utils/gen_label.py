@@ -161,7 +161,6 @@ if __name__ == "__main__":
     test_split_label()
 
     im_path = '/home/ubuntu/datasets/lpr/val/*.jpg'
-    im_path = '/Users/haoyu/Documents/datasets/lpr/val/*.jpg'
     im_path = glob.glob(im_path)
     random.shuffle(im_path)
 

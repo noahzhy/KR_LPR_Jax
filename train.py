@@ -3,7 +3,6 @@ import os, sys, random, time, glob, math
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".90"
 
 import jax
-# because of the bug of jax on mac os
 if sys.platform == "darwin":
     jax.config.update('jax_platform_name', 'cpu')
 

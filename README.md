@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) 
 [![JAX](https://img.shields.io/badge/JAX-0.4.25-blue)](https://github.com/google/jax) 
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/noahzhy/KR_LPR_TF)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/noahzhy/KR_LPR)
 
 This repository is a JAX implementations of lightweight license plate recognition (LPR) models.
 
@@ -36,37 +36,21 @@ The order of the bounding boxes should be the same as the order of the character
 The dataloader will parse the data and convert the license plate characters to the integer using the `labels.names` file. The license plate images will be resized to `(64, 128)` or any other size you want. In addition, the mask of the license plate number will be created via the bounding boxes and the mask will be used to calculate the loss.
 
 The losses of the model are as follows:
-$$
-L_{total} = \alpha * L_{FocalCTC} + \beta * L_{CenterCTC} + \gamma * L_{DiceBCE}, \quad \alpha = 1.5, \beta = 0.01, \gamma = 0.5
-$$
+
+**For CTC**:
 
 $$
-L_{CTC} = -\log \sum_{s \in S} P(s|X)
-$$
-$$
-L_{FocalCTC} = \alpha (1 - P(s|X))^\gamma L_{CTC}, \quad \alpha = 0.8, \gamma = 3
+L_{CTC} = \alpha * L_{focal} + \beta * \mathbb{1}_{\{t \geq 20k\}} L_{center}
 $$
 
-<!-- $$
-L_{DiceBCE} = L_{Dice} + L_{BCE}
-$$
-$$
-L_{Dice} = 1 - \frac{2|Y \cap \hat{Y}|}{|Y| + |\hat{Y}|}
-$$
-$$
-L_{BCE} = -\frac{1}{N} \sum_{i=1}^N (Y_i \log(\hat{Y}_i) + (1 - Y_i) \log(1 - \hat{Y}_i))
-$$
+**For Mask**:
 
+$$ 
+L_{Mask} = L_{Dice} + L_{BCE}
 $$
-L_{CenterCTC} = -\log \sum_{s \in S} P(s|X) \cdot \exp(-\frac{(x - \mu_x)^2}{2\sigma_x^2} - \frac{(y - \mu_y)^2}{2\sigma_y^2})
-$$ -->
 
 ## Benchmark
 
 |  Model    | Input Shape  |  Size  | Accuracy | Speed (ms) |
 | --------- | ------------ | ------ | -------- | ----------:|
-| tinyLPR-s | (64, 128, 1) | - KB   |  -       | - ms       |
-| tinyLPR-l | (96, 192, 1) | 80 KB  |  0.9926  | 0.71 ms    |
-
-
-## Ablation Study
+| tinyLPR | (96, 192, 1) | 86 KB  |  0.9908  | 0.44 ms    |

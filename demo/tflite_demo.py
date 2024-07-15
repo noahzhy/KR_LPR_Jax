@@ -107,7 +107,7 @@ if __name__ == '__main__':
     num_samples = 10000
     img_size = (96, 192)
     # init and load model
-    demo = TFliteDemo('model.tflite', size=img_size)
+    demo = TFliteDemo('demo/model.tflite', size=img_size)
 
     # get random image
     val_path = "/Users/haoyu/Documents/datasets/lpr/val"

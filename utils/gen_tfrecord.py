@@ -23,10 +23,6 @@ def gen_mask(bbox, size, len_label, time_step=15):
         # mask[b1:b3, b0:b2, time_step-(2*(len_label-i)-1)] = 1
 
         hmap = draw_heatmaps((1, h, w, 1), [[box]])
-        # # show the heatmap
-        # plt.imshow(hmap[0, :, :, 0], cmap='gray')
-        # plt.show()
-        # quit()
         mask[:, :, time_step-(2*(len_label-i)-1)] = hmap[:, :, :, 0]
 
     return mask
@@ -76,11 +72,11 @@ def gen_tfrecord(dir_path, file_name):
         height, width, _ = image.shape
         mask = gen_mask(bbox, (height, width), len(label))
 
-        # sum the mask to one channel
-        print('shape:', image.shape, mask.shape, len(label))
-        mask = np.sum(mask, axis=-1)
-        mask = Image.fromarray(np.array(mask * 255, dtype=np.uint8))
-        mask.save('test.png')
+        # # sum the mask to one channel
+        # print('shape:', image.shape, mask.shape, len(label))
+        # mask = np.sum(mask, axis=-1)
+        # mask = Image.fromarray(np.array(mask * 255, dtype=np.uint8))
+        # mask.save('test.png')
 
         # # draw box on the image
         # image = Image.fromarray(np.array(image, dtype=np.uint8))
@@ -92,7 +88,7 @@ def gen_tfrecord(dir_path, file_name):
         # # img.show()
         # # save the image
         # image.save('test.jpg')
-        quit()
+        # quit()
 
         image = np.array(image, dtype=np.uint8).tobytes()
         mask = np.array(mask, dtype=np.int64).tobytes()

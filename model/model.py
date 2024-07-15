@@ -121,7 +121,6 @@ class SpatialAttn(nn.Module):
 
     @nn.compact
     def __call__(self, inputs):
-        # _avg = jnp.mean(inputs, axis=-1, keepdims=True)
         _min = jnp.min(inputs, axis=-1, keepdims=True)
         _max = jnp.max(inputs, axis=-1, keepdims=True)
         x = jnp.concatenate([_max, _min], axis=-1)
