@@ -1,6 +1,6 @@
 # Lightweight License Plate Recognition with JAX
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) 
+[![License](https://img.shields.io/badge/license-GPLv3-blue)](https://www.gnu.org/licenses/gpl-3.0.html)
 [![JAX](https://img.shields.io/badge/JAX-0.4.25-blue)](https://github.com/google/jax) 
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/noahzhy/KR_LPR)
 
@@ -14,12 +14,12 @@ The labeled data is required to train the model. The data should be organized as
 - data
   - labels.names
   - train
-    - {license_plate_number}_{image_number}.jpg
-    - {license_plate_number}_{image_number}.txt
+    - {license_plate_number}_{index}.jpg
+    - {license_plate_number}_{index}.txt
     - ...
   - val
-    - {license_plate_number}_{image_number}.jpg
-    - {license_plate_number}_{image_number}.txt
+    - {license_plate_number}_{index}.jpg
+    - {license_plate_number}_{index}.txt
     - ...
 ```
 
@@ -33,15 +33,22 @@ xn yn xn yn
 
 The order of the bounding boxes should be the same as the order of the characters in the license plate number.
 
-The dataloader will parse the data and convert the license plate characters to the integer using the `labels.names` file. The license plate images will be resized to `(64, 128)` or any other size you want. In addition, the mask of the license plate number will be created via the bounding boxes and the mask will be used to calculate the loss.
+The dataloader will parse the data and convert the license plate characters to the integer using the `labels.names` file. The license plate images will be resized to `(96, 192)` or any other size you want. In addition, the mask of the license plate number will be created via the bounding boxes and the mask will be used to calculate the loss.
 
 The losses of the model are as follows:
 
 **For CTC**:
 
-$$
-L_{CTC} = \alpha * L_{focal} + \beta * \mathbb{1}_{\{t \geq 20k\}} L_{center}
-$$
+$$ L_{focal} = -\alpha_t (1 - p_t)^\gamma \log(p_t) $$
+
+$$ L_{center} = \sum_{i=1}^{n} \left(1 - \frac{c_i}{t}\right)^2 $$
+
+$$ L_{CTC} = \alpha * L_{focal} + \beta * L_{center},L_{center} = \left\{
+  \begin{aligned}
+    0,            \quad\text{if } t \leq 20k    \\
+    L_{center},   \quad\text{otherwise}         \\
+  \end{aligned} 
+\right. $$
 
 **For Mask**:
 
@@ -51,6 +58,6 @@ $$
 
 ## Benchmark
 
-|  Model    | Input Shape  |  Size  | Accuracy | Speed (ms) |
-| --------- | ------------ | ------ | -------- | ----------:|
-| tinyLPR | (96, 192, 1) | 86 KB  |  0.9908  | 0.44 ms    |
+| Model   | Input Shape  | Size  | Accuracy | Speed (ms) |
+| ------- | ------------ | ----- | -------- | ---------: |
+| tinyLPR | (96, 192, 1) | 86 KB | 0.9908   |    0.44 ms |
