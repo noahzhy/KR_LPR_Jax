@@ -53,12 +53,13 @@ $$ L_{focal} = -\alpha_t (1 - p_t)^\gamma \log(p_t) $$
 
 $$ L_{center} = \sum_{i=1}^{n} \left(1 - \frac{c_i}{t}\right)^2 $$
 
-$$ L_{CTC} = \alpha * L_{focal} + \beta * L_{center} = \left\{
+$$ L_{CTC} = \alpha * L_{focal} + \beta * L_{center} = 
+\begin{cases}
   \begin{aligned}
     0,            \quad\text{if } t \leq 20k    \\
     L_{center},   \quad\text{otherwise}         \\
   \end{aligned} 
-\right. $$
+\end{cases} $$
 
 **For Mask**:
 
