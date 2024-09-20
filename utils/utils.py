@@ -23,27 +23,15 @@ def load_image(image_path):
 
 # center fit and support rgb img
 def center_fit(img, w, h, inter=cv2.INTER_NEAREST, top_left=True):
-    # get img shape
     img_h, img_w = img.shape[:2]
-    # get ratio
     ratio = min(w / img_w, h / img_h)
-
-    if len(img.shape) == 3:
-        inter = cv2.INTER_AREA
-    # resize img
     img = cv2.resize(img, (int(img_w * ratio), int(img_h * ratio)), interpolation=inter)
     # get new img shape
     img_h, img_w = img.shape[:2]
-    # get start point
-    start_w = (w - img_w) // 2
-    start_h = (h - img_h) // 2
-
-    if top_left:
-        start_w = 0
-        start_h = 0
+    start_w = 0 if top_left else (w - img_w) // 2
+    start_h = 0 if top_left else (h - img_h) // 2
 
     if len(img.shape) == 2:
-        # create new img
         new_img = np.zeros((h, w), dtype=np.uint8)
         new_img[start_h:start_h+img_h, start_w:start_w+img_w] = img
     else:

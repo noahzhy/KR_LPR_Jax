@@ -33,40 +33,32 @@ lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 
 
 @jax.jit
-def train_step(state: TrainState, batch, opt_state):
-    img, mask, label = batch
-    def loss_fn(params):
-        (pred_mask, pred_feat, pred_ctc), updates = state.apply_fn({
-            'params': params,
-            'batch_stats': state.batch_stats
-        }, img, train=True, mutable=['batch_stats'])
-        loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
-        loss_mask = dice_bce_loss(pred_mask, mask)
-        loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
+def loss_fn(pred, target):
+    pred_mask, pred_feat, pred_ctc = pred
+    mask, label = target
 
-        loss_center = jax.lax.cond(
-            state.step <= train_len * 20,
-            lambda x: jnp.array(.0, dtype=jnp.float32),
-            lambda x: loss_center,
-            None
-        )
+    loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
+    loss_mask = dice_bce_loss(pred_mask, mask)
+    loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
-        loss = (cfg["focal_ctc_loss"]["weight"] * loss_ctc +
-                cfg["dice_bce_loss"]["weight"] * loss_mask +
-                cfg["center_ctc_loss"]["weight"] * loss_center)
+    loss_center = jax.lax.cond(
+        state.step <= train_len * 20,
+        lambda x: jnp.array(.0, dtype=jnp.float32),
+        lambda x: loss_center,
+        None
+    )
 
-        loss_dict = {
-            'loss': loss,
-            'loss_ctc': loss_ctc,
-            'loss_mask': loss_mask,
-            'loss_center': loss_center,
-        }
-        return loss, (loss_dict, updates)
+    loss = (cfg["focal_ctc_loss"]["weight"] * loss_ctc +
+            cfg["dice_bce_loss"]["weight"]  * loss_mask +
+            cfg["center_ctc_loss"]["weight"]* loss_center)
 
-    (_, (loss_dict, updates)), grads = jax.value_and_grad(loss_fn, has_aux=True)(state.params)
-    state = state.apply_gradients(grads=grads, batch_stats=updates['batch_stats'])
-    _, opt_state = state.tx.update(grads, opt_state)
-    return state, loss_dict, opt_state
+    loss_dict = {
+        'loss': loss,
+        'loss_ctc': loss_ctc,
+        'loss_mask': loss_mask,
+        'loss_center': loss_center,
+    }
+    return loss, loss_dict
 
 
 def predict(state: TrainState, batch):
@@ -82,9 +74,8 @@ def eval_step(state: TrainState, batch):
     pred_ctc, label = jax.jit(predict)(state, batch)
     label = batch_remove_blank(label)
     pred = batch_ctc_greedy_decoder(pred_ctc)
-    acc = jnp.mean(jnp.array([1 if jnp.array_equal(
-        l, p) else 0 for l, p in zip(label, pred)]))
-    return state, acc
+    acc = jnp.mean(jnp.array([1 if jnp.array_equal(l, p) else 0 for l, p in zip(label, pred)]))
+    return acc
 
 
 if __name__ == "__main__":
@@ -106,9 +97,10 @@ if __name__ == "__main__":
     state = load_ckpt(state, cfg["ckpt"])
 
     fit(state, train_dl, val_dl,
-        train_step=train_step,
+        loss_fn=loss_fn,
         eval_step=eval_step,
         num_epochs=cfg["epochs"],
         eval_freq=cfg["eval_freq"],
-        log_name="tiny_lpr",
+        log_name="tinyLPR",
+        hparams=cfg,
     )

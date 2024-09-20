@@ -24,7 +24,7 @@ def decode_data(example):
     mask = tf.io.decode_raw(example['mask'], tf.int64)
     size = tf.io.decode_raw(example['size'], tf.int64)
     # convert to float32 and normalize
-    image = tf.cast(image, tf.float32) / 255.
+    image = tf.cast(image, tf.float32) / 255.0
     return image, mask, label, size
 
 
@@ -61,97 +61,56 @@ def align_label(label, time_step=TIME_STEPS):
     return tf.pad(label, [[0, time_step - len(label)]], 'CONSTANT')
 
 
-def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
-    # Pad image and mask if dimensions do not match target size
-    if image.shape[:2] != target_size:
-        image = tf.image.pad_to_bounding_box(image, 0, 0, target_size[0], target_size[1])
-        mask = tf.image.pad_to_bounding_box(mask, 0, 0, target_size[0], target_size[1])
-
-    # Convert image to grayscale
+def pad_image_and_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
+    image = tf.image.resize_with_pad(image, target_size[0], target_size[1])
+    mask = tf.image.resize_with_pad(mask, target_size[0], target_size[1])
     image = tf.image.rgb_to_grayscale(image)
     label = align_label(label, time_step)
     return image, mask, label
 
 
-def random_pad(image, mask, label, target_size=TARGET_SIZE):
-    H, W = target_size
-    h, w = tf.shape(image)[0], tf.shape(image)[1]
-    pad_h = tf.maximum(0, H - h)
-    pad_w = tf.maximum(0, W - w)
-    # Randomize padding if the original dimensions are smaller than target
-    if pad_h > 0: pad_h = tf.random.uniform((), 0, pad_h, dtype=tf.int32)
-    if pad_w > 0: pad_w = tf.random.uniform((), 0, pad_w, dtype=tf.int32)
-    # Pad image and mask
-    image = tf.image.pad_to_bounding_box(image, pad_h, pad_w, H, W)
-    mask = tf.image.pad_to_bounding_box(mask, pad_h, pad_w, H, W)
-    return image, mask, label
+def adjust_gamma(image):
+    gamma = np.random.uniform(1.0, 2.0)
+    gain = np.random.uniform(0.7, 1.5)
+    return tf.image.adjust_gamma(image, gamma, gain)
 
 
 def data_augment(image, mask, label):
-    gamma = np.random.uniform(low=1.0, high=2, size=[1,])
-    gain = np.random.uniform(low=0.7, high=1.5, size=[1,])
-    image = tf.image.adjust_gamma(image, gamma[0], gain[0])
+    image = adjust_gamma(image)
     image = tf.image.random_contrast(image, 0.2, 1.5)
     image = tf.image.random_hue(image, 0.3)
     image = tf.image.random_saturation(image, 0.1, 2.0)
     image = tf.image.random_brightness(image, 0.3)
-    # color inversion
-    if tf.random.uniform(()) > 0.5: image = tf.math.abs(1 - image)
-    # clip to [0, 1]
-    image = tf.clip_by_value(image, 0, 1)
-    return image, mask, label
-
-
-# image, mask, label -> image, (mask, label)
-def restructuring(image, mask, label):
-    return image, (mask, label)
+    if tf.random.uniform(()) > 0.5:
+        image = tf.math.abs(1 - image)  # 颜色反转
+    return tf.clip_by_value(image, 0, 1), mask, label
 
 
 def get_data(tfrecord, batch_size=32, data_aug=True, n_map_threads=n_map_threads):
-    dataset = tf.data.TFRecordDataset(
-        tfrecord, compression_type='ZLIB', num_parallel_reads=n_map_threads)
+    dataset = tf.data.TFRecordDataset(tfrecord, compression_type='ZLIB', num_parallel_reads=n_map_threads)
     ds_len = sum(1 for _ in dataset) // batch_size
+
     ds = dataset.map(decode_data, num_parallel_calls=n_map_threads)
     ds = ds.map(reshape_fn, num_parallel_calls=n_map_threads)
 
     if data_aug:
         ds = ds.map(data_augment, num_parallel_calls=n_map_threads)
         ds = ds.map(random_resize, num_parallel_calls=n_map_threads)
-        ds = ds.map(random_pad, num_parallel_calls=n_map_threads)
     else:
-        ds = ds.map(lambda img, msk, lbl: resize_image(
-            img, msk, lbl, keep_ratio=True), num_parallel_calls=n_map_threads)
+        ds = ds.map(lambda img, msk, lbl: resize_image(img, msk, lbl, keep_ratio=True), num_parallel_calls=n_map_threads)
 
-    ds = ds.map(pad_image_mask, num_parallel_calls=n_map_threads)
-    ds = ds.map(restructuring, num_parallel_calls=n_map_threads)
-    ds = ds.shuffle(4096, reshuffle_each_iteration=data_aug
-        ).batch(batch_size, drop_remainder=True
-        ).prefetch(tf.data.experimental.AUTOTUNE)
+    ds = ds.map(pad_image_and_mask, num_parallel_calls=n_map_threads)
+    ds = ds.shuffle(4096).batch(batch_size, drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
+
     return ds, ds_len
 
 
 if __name__ == "__main__":
-    import tensorflow_datasets as tfds
-    import os
-    import sys
-    import random
-    import time
-    import glob
-    import math
-    import tqdm
-    from PIL import Image
-
+    import matplotlib.pyplot as plt
     batch_size = 8
     time_steps = 16
     aug = False
     BLANK_ID = -1
-
-    # load dict from names file to dict
-    with open("data/labels.names", "r") as f:
-        names = f.readlines()
-    names = [name.strip() for name in names]
-    names = {i: name for i, name in enumerate(names)}
-    print(names)
 
     label = tf.constant([1, 2, 3, 4, 5, 6, 7])
     res = align_label(label, time_steps)
@@ -161,32 +120,3 @@ if __name__ == "__main__":
     print(res)
 
     quit()
-
-    tfrecord_path = "/home/noah/datasets/lpr/val.tfrecord"
-    # tfrecord_path = "data/val.tfrecord"
-    ds, ds_len = get_data(tfrecord_path, batch_size, aug)
-    dl = tfds.as_numpy(ds)
-
-    for data in tqdm.tqdm(dl, total=ds_len):
-        img, mask, label = data
-        print(img.shape, mask.shape, label.shape)
-
-        # save one image as test.jpg
-        img = img[0] * 255
-        img = np.squeeze(img, -1)
-        img = Image.fromarray(np.uint8(img))
-        img.save('test.jpg')
-
-        for i in range(16):
-            # save as i.png
-            mask_ = mask[0][:, :, i] * 255
-            mask_ = Image.fromarray(np.uint8(mask_))
-            mask_.save(f'tmp/{i}.png')
-
-        # sum the mask to one channel
-        mask = mask[0] * 255
-        mask = np.sum(mask, axis=-1)
-        # save the mask as test.png
-        mask = Image.fromarray(np.uint8(mask))
-        mask.save('test.png')
-        break
