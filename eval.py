@@ -85,14 +85,15 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
         apply_fn=model.apply,
         params=params,
         batch_stats=batch_stats,
-        tx=optax.adam(1e-3),
+        tx=optax.inject_hyperparams(optax.nadam)(3e-4),
     )
 
-    state = load_ckpt(state, ckpt_dir)
+    import orbax.checkpoint as ocp
+    manager = ocp.PyTreeCheckpointer()
+    state = manager.restore(ckpt_dir, item=state)
 
     img = tf.io.read_file(image_path)
     img = tf.io.decode_jpeg(img, channels=1)
-    # pad to 1:2
     img = tf.image.resize(
         img, (96, 192), method=tf.image.ResizeMethod.BILINEAR, antialias=True, preserve_aspect_ratio=True
     )
@@ -129,7 +130,7 @@ if __name__ == "__main__":
     model = TinyLPR(**cfg["model"])
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "weights/L16_9908"
+    ckpt_dir = "weights/best"
 
     # test_val = "data/val.tfrecord"
     # acc = eval(key, model, input_shape, ckpt_dir, test_val)
