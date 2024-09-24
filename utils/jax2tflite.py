@@ -106,11 +106,13 @@ if __name__ == "__main__":
         apply_fn=model.apply,
         params=params,
         batch_stats=batch_stats,
-        tx=optax.nadam(3e-4)
+        tx=optax.inject_hyperparams(optax.nadam)(3e-4)
     )
 
-    # state = load_ckpt(state, "weights/96x192/LPR_focal_dice_ctr_later_s2")
-    state = load_ckpt(state, "weights/L16_9908")
+    # state = load_ckpt(state, "weights/L16_9908")
+    import orbax.checkpoint as ocp
+    manager = ocp.PyTreeCheckpointer()
+    state = manager.restore("weights/best", item=state)
 
     inout_type = tf.float32
     # inout_type = tf.uint8

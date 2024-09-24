@@ -1,3 +1,4 @@
+import time
 from itertools import groupby
 
 import yaml

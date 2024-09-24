@@ -212,7 +212,6 @@ if __name__ == '__main__':
     jax.config.update("jax_platform_name", "cpu")
     model = TinyLPR(time_steps=16, n_class=68, n_feat=64)
     key = jax.random.PRNGKey(0)
-    # x = jnp.zeros((1, 64, 128, 1))
     x = jnp.zeros((1, 96, 192, 1))
     tabulate_fn = nn.tabulate(
         model, key, compute_flops=True, compute_vjp_flops=True)

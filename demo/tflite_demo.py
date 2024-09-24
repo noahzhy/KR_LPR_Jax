@@ -104,15 +104,15 @@ class TFliteDemo:
 
 
 if __name__ == '__main__':
-    num_samples = 10000
+    num_samples = 1000
     img_size = (96, 192)
     # init and load model
-    demo = TFliteDemo('demo/model.tflite', size=img_size)
+    demo = TFliteDemo('model.tflite', size=img_size)
 
     # get random image
     val_path = "/Users/haoyu/Documents/datasets/lpr/val"
     # random seed
-    random.seed(0)
+    random.seed(1)
     img_list = random.sample(glob.glob(os.path.join(val_path, '*.jpg')), num_samples)
 
     res_confs = []
@@ -146,18 +146,9 @@ if __name__ == '__main__':
 
         if gt == label:
             correct_count += 1
-            # print("\33[92m[Correct]\33[00m", end=' ')
         else:
-            # set diff
-            diff = set(gt) - set(label)
-            # if diff set is all number
-            try:
-                n = int(''.join(diff))
-                print("\33[91m[ Error ]\33[00m", end=' ')
-                print("path: {:20s} \tlabel: {:20s} \tconf: {:.4f}".format(result['image_path'], result['label'], result['conf']))
-            except:
-                # print("path: {:20s} \tlabel: {:20s} \tconf: {:.4f}".format(result['image_path'], result['label'], result['conf']))
-                pass
+            print("\33[91m[ Error ]\33[00m", end=' ')
+            print("path: {:20s} \tlabel: {:20s} \tconf: {:.4f}".format(result['image_path'], result['label'], result['conf']))
 
     print('\33[92m[done]\33[00m avg time: {:.4f} ms'.format(np.mean(avg_time)))
     print('\33[92m[done]\33[00m accuracy: {:.4f}'.format(correct_count / len(res_confs)))
