@@ -61,13 +61,20 @@ def align_label(label, time_step=TIME_STEPS):
     return tf.pad(label, [[0, time_step - len(label)]], 'CONSTANT')
 
 
-def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
-    # Pad image and mask if dimensions do not match target size
-    if image.shape[:2] != target_size:
-        image = tf.image.pad_to_bounding_box(image, 0, 0, target_size[0], target_size[1])
-        mask = tf.image.pad_to_bounding_box(mask, 0, 0, target_size[0], target_size[1])
+# def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
+#     # Pad image and mask if dimensions do not match target size
+#     if image.shape[:2] != target_size:
+#         image = tf.image.pad_to_bounding_box(image, 0, 0, target_size[0], target_size[1])
+#         mask = tf.image.pad_to_bounding_box(mask, 0, 0, target_size[0], target_size[1])
 
-    # Convert image to grayscale
+#     # Convert image to grayscale
+#     image = tf.image.rgb_to_grayscale(image)
+#     label = align_label(label, time_step)
+#     return image, mask, label
+
+def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
+    image = tf.image.resize_with_pad(image, target_size[0], target_size[1])
+    mask = tf.image.resize_with_pad(mask, target_size[0], target_size[1])
     image = tf.image.rgb_to_grayscale(image)
     label = align_label(label, time_step)
     return image, mask, label
