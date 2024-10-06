@@ -1,9 +1,9 @@
 import os, sys, glob
 
 import numpy as np
-from PIL import Image, ImageDraw
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 
 sys.path.append("./utils")
 from gen_label import *
@@ -91,7 +91,7 @@ def gen_tfrecord(dir_path, file_name):
         # quit()
 
         image = np.array(image, dtype=np.uint8).tobytes()
-        mask = np.array(mask, dtype=np.int64).tobytes()
+        mask = np.array(mask, dtype=np.float32).tobytes()
         label = np.array(label, dtype=np.int64).tobytes()
 
         size = np.array([height, width], dtype=np.int64).tobytes()
@@ -112,8 +112,10 @@ def gen_tfrecord(dir_path, file_name):
 
 if __name__ == '__main__':
     val_path = '/Users/haoyu/Documents/datasets/lpr/val'
+    test_path = '/Users/haoyu/Documents/datasets/lpr/test'
     train_path = '/Users/haoyu/Documents/datasets/lpr/train'
 
     gen_tfrecord(val_path, 'val')
+    gen_tfrecord(test_path, 'test')
     gen_tfrecord(train_path, 'train')
     print('done')

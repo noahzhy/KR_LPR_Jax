@@ -24,11 +24,16 @@ class UpSample(nn.Module):
 
     @nn.compact
     def __call__(self, x, train=True):
-        for _ in range(self.up_repeat):
+        for idx, _ in enumerate(range(self.up_repeat)):
             x = jax.image.resize(x, shape=(
                 x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
-            x = nn.Conv(features=64, kernel_size=(5, 5), strides=(
-                1, 1), padding="same", kernel_init=nn.initializers.he_normal(), use_bias=False)(x)
+            x = nn.Conv(
+                features=32 * 2 ** (self.up_repeat-idx-1),
+                kernel_size=(3, 3),
+                strides=(1, 1),
+                padding="same",
+                kernel_init=nn.initializers.he_normal(),
+                use_bias=False)(x)
             x = nn.BatchNorm(use_running_average=not train)(x)
             x = nn.PReLU()(x)
         return x
@@ -141,8 +146,6 @@ class Conv1x1(nn.Module):
             use_bias=True,
             kernel_init=nn.initializers.kaiming_normal()
         )(inputs)
-        # # x = nn.relu(x)
-        # x = nn.softmax(x)
         return x
 
 
@@ -191,7 +194,6 @@ class TinyLPR(nn.Module):
         out = self.dense(mat)
 
         if train:
-            # softmax attn
             attn = nn.softmax(attn)
             attn = UpSample(up_repeat=3)(attn, train)
             attn = nn.Conv(features=self.time_steps,
@@ -199,8 +201,7 @@ class TinyLPR(nn.Module):
                            strides=1,
                            padding="same",
                            kernel_init=nn.initializers.kaiming_normal(),
-                           use_bias=True
-                           )(attn)
+                           use_bias=True)(attn)
             return attn, mat, out
 
         # out = nn.log_softmax(out)
