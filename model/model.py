@@ -25,8 +25,6 @@ class UpSample(nn.Module):
     @nn.compact
     def __call__(self, x, train=True):
         for idx, _ in enumerate(range(self.up_repeat)):
-            x = jax.image.resize(x, shape=(
-                x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
             x = nn.Conv(
                 features=32 * 2 ** (self.up_repeat-idx-1),
                 kernel_size=(3, 3),
@@ -35,7 +33,10 @@ class UpSample(nn.Module):
                 kernel_init=nn.initializers.he_normal(),
                 use_bias=False)(x)
             x = nn.BatchNorm(use_running_average=not train)(x)
-            x = nn.PReLU()(x)
+            x = jax.image.resize(x,
+                shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]),
+                method="bilinear")
+            # x = nn.PReLU()(x)
         return x
 
 
@@ -86,23 +87,25 @@ class MobileNetV3Small(nn.Module):
             [3,  16,    16,     16,     nn.relu,    2],
             [3,  16,    72,     24,     nn.relu,    1],
             [3,  24,    88,     24,     nn.relu,    1],
-            [5,  24,    96,     40,     nn.relu6,   2],
-            [5,  40,    240,    40,     nn.relu6,   1],
-            [5,  40,    120,    48,     nn.relu6,   1],
-            [5,  48,    144,    48,     nn.relu6,   1],
+            [5,  24,    96,     40,     nn.relu,    2],
+            [5,  40,    240,    40,     nn.relu,    1],
+            [5,  40,    120,    48,     nn.relu,    1],
+            [5,  48,    144,    48,     nn.relu,    1],
         ]
 
     @nn.compact
     def __call__(self, x, train=True):
         # 64, 128, 1
-        x = nn.Conv(features=16, kernel_size=(3, 3), strides=(
-            2, 2), padding="same", use_bias=False)(x)
+        x = nn.Conv(features=16,
+                    kernel_size=(3, 3),
+                    strides=(2, 2),
+                    padding="same",
+                    use_bias=False)(x)
         x = nn.BatchNorm(use_running_average=not train)(x)
         x = nn.relu(x)
 
         for i, (k, _in, exp, out, NL, s) in enumerate(self.bnecks):
-            x = BottleNeck(_in, exp, out, s, k, NL,
-                           self.width_multiplier)(x, train)
+            x = BottleNeck(_in, exp, out, s, k, NL, self.width_multiplier)(x, train)
 
         # last
         x = BottleNeck(16, 72, self.out_channels, 1, 5, nn.relu, 1.0)(x, train)

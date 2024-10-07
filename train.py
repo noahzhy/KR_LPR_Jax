@@ -38,7 +38,7 @@ def loss_fn(pred, target):
     mask, label = target
 
     loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
-    loss_mask = dice_bce_loss(pred_mask, mask)
+    loss_mask = smooth_l1_loss(pred_mask, mask)
     loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(

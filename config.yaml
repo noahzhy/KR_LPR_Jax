@@ -14,12 +14,12 @@ eval_freq: 10
 # data config
 train:
   batch_size: *bs
-  tfrecord: "/home/ubuntu/datasets/lpr/L16/train.tfrecord"
+  tfrecord: "/home/ubuntu/datasets/lpr/train.tfrecord"
   data_aug: True
 
 val:
   batch_size: *bs
-  tfrecord: "/home/ubuntu/datasets/lpr/L16/val.tfrecord"
+  tfrecord: "/home/ubuntu/datasets/lpr/val.tfrecord"
   data_aug: False
 
 # model config

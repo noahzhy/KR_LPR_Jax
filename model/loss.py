@@ -7,6 +7,27 @@ import optax
 import jax.numpy as jnp
 
 
+# smooth l1 loss
+@jax.jit
+def smooth_l1_loss(logits, targets, threshold=0.5):
+    x = jnp.abs(logits - targets)
+    return jnp.where(x < threshold, 0.5 * x ** 2, threshold * (x - 0.5 * threshold)).mean()
+
+
+def smooth_l1_loss_test():
+    import numpy as np
+    logits = np.random.randn(2, 4, 4).astype(np.float32)
+    targets = np.random.randn(2, 4, 4).astype(np.float32)
+    start_t = perf_counter()
+    for i in range(1000):
+        loss = smooth_l1_loss(logits, targets)
+    end_t = perf_counter()
+    avg_time = (end_t - start_t) / 1000
+    print('\33[92m[pass]\33[00m smooth_l1_loss() test passed.')
+    print('  - loss:', loss)
+    print('  - time: {:.6f} ms'.format(avg_time*1000))
+
+
 # ctc loss
 @partial(jax.jit, static_argnums=(2,))
 def ctc_loss(logits, targets, blank_id=-1, **kwargs):
@@ -143,3 +164,4 @@ if __name__ == "__main__":
     dice_bce_test()
     focal_ctc_loss_test()
     center_ctc_loss_test()
+    smooth_l1_loss_test()
