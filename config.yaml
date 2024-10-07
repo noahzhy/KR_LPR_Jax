@@ -9,7 +9,7 @@ blank_id: &bi -1
 lr: 1.5e-3
 warmup: 0
 epochs: 200
-eval_freq: 10
+eval_freq: 5
 
 # data config
 train:

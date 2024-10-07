@@ -20,9 +20,9 @@ def decode_data(example):
     }
     example = tf.io.parse_single_example(example, ds_desc)
     image = tf.io.decode_raw(example['image'], tf.uint8)
-    label = tf.io.decode_raw(example['label'], tf.int64)
-    mask = tf.io.decode_raw(example['mask'], tf.float32)
-    size = tf.io.decode_raw(example['size'], tf.int64)
+    label = tf.io.decode_raw(example['label'], tf.int32)
+    mask = tf.io.decode_raw(example['mask'], tf.int32)
+    size = tf.io.decode_raw(example['size'], tf.int32)
     # convert to float32 and normalize
     image = tf.cast(image, tf.float32) / 255.
     return image, mask, label, size
@@ -38,10 +38,10 @@ def resize_image(image, mask, label, target_size=TARGET_SIZE, keep_ratio=False):
     method = tf.image.ResizeMethod.BILINEAR
     if keep_ratio:
         image = tf.image.resize(image, target_size, method=method, antialias=True, preserve_aspect_ratio=True)
-        mask = tf.image.resize(mask, target_size, method=method, antialias=True, preserve_aspect_ratio=True)
+        mask = tf.image.resize(mask, target_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, antialias=False, preserve_aspect_ratio=True)
     else:
         image = tf.image.resize(image, target_size, method=method, antialias=True)
-        mask = tf.image.resize(mask, target_size, method=method, antialias=True)
+        mask = tf.image.resize(mask, target_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, antialias=True)
     return image, mask, label
 
 
@@ -152,10 +152,10 @@ if __name__ == "__main__":
     res = align_label(label, time_steps)
     print(res)
 
-    quit()
+    # quit()
 
-    tfrecord_path = "/home/noah/datasets/lpr/val.tfrecord"
-    # tfrecord_path = "data/tmp_test.tfrecord"
+    # tfrecord_path = "/home/noah/datasets/lpr/val.tfrecord"
+    tfrecord_path = "data/tmp_test.tfrecord"
     ds, ds_len = get_data(tfrecord_path, batch_size, aug)
     dl = tfds.as_numpy(ds)
 

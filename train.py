@@ -26,7 +26,6 @@ print(cfg)
 
 val_ds, _ = get_data(**cfg["val"])
 train_ds, train_len = get_data(**cfg["train"])
-print("train_len:", train_len)
 train_dl, val_dl = tfds.as_numpy(train_ds), tfds.as_numpy(val_ds)
 
 lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
@@ -38,7 +37,7 @@ def loss_fn(pred, target):
     mask, label = target
 
     loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
-    loss_mask = smooth_l1_loss(pred_mask, mask)
+    loss_mask = dice_bce_loss(pred_mask, mask)
     loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(

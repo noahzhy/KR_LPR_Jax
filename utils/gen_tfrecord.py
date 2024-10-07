@@ -13,9 +13,10 @@ from utils import load_image
 cfg = yaml.safe_load(open("config.yaml"))
 TIME_STEPS = cfg["time_steps"]
 
+from tqdm import tqdm
 
 def gen_mask(bbox, size, len_label, time_step=TIME_STEPS):
-    mask = np.zeros((size[0], size[1], time_step), dtype=np.float32)
+    mask = np.zeros((size[0], size[1], time_step), dtype=np.int32)
     h, w = size
 
     for i, box in enumerate(bbox):
@@ -24,10 +25,10 @@ def gen_mask(bbox, size, len_label, time_step=TIME_STEPS):
         b2 = min(w, box[2])
         b3 = min(h, box[3])
         # mask[b1:b3, b0:b2, i] = 1
-        # mask[b1:b3, b0:b2, time_step-(2*(len_label-i)-1)] = 1
+        mask[b1:b3, b0:b2, time_step-(2*(len_label-i)-1)] = 1
 
-        hmap = draw_heatmaps((1, h, w, 1), [[box]])
-        mask[:, :, time_step-(2*(len_label-i)-1)] = hmap[:, :, :, 0]
+        # hmap = draw_heatmaps((1, h, w, 1), [[box]])
+        # mask[:, :, time_step-(2*(len_label-i)-1)] = hmap[:, :, :, 0]
 
     return mask
 
@@ -40,7 +41,7 @@ def resize_image_keep_aspect_ratio(image, bbox, width=192):
     new_h = int(h * ratio)
     image = tf.image.resize(image, (new_h, width), antialias=True)
     bbox = tf.cast(bbox, tf.float32)
-    bbox = tf.cast(tf.round(bbox * ratio), tf.int64)
+    bbox = tf.cast(tf.round(bbox * ratio), tf.int32)
     return image, bbox
 
 
@@ -50,7 +51,7 @@ def resize_image_and_bbox(image, bbox, size=(96, 192)):
     r_w = size[1] / w
     image = tf.image.resize(image, size, antialias=True)
     bbox = tf.cast(bbox, tf.float32)
-    bbox = tf.cast(tf.round(bbox * [r_w, r_h, r_w, r_h]), tf.int64)
+    bbox = tf.cast(tf.round(bbox * [r_w, r_h, r_w, r_h]), tf.int32)
     return image, bbox
 
 
@@ -65,14 +66,13 @@ def gen_tfrecord(dir_path, file_name):
 
     img_ds = glob.glob(dir_path + '/*.jpg')
 
-    for img_path in img_ds:
+    for img_path in tqdm(img_ds):
         txt_path = img_path.replace('.jpg', '.txt')
-        bbox = np.loadtxt(txt_path, dtype=np.int64)
+        bbox = np.loadtxt(txt_path, dtype=np.int32)
         _, label = gen_label(img_path)
 
         image = Image.open(img_path).convert('RGB')
         image, bbox = resize_image_keep_aspect_ratio(np.array(image, dtype=np.float32), bbox)
-        # image, bbox = resize_image_and_bbox(np.array(image, dtype=np.float32), bbox)
         height, width, _ = image.shape
         mask = gen_mask(bbox, (height, width), len(label))
 
@@ -95,10 +95,9 @@ def gen_tfrecord(dir_path, file_name):
         # quit()
 
         image = np.array(image, dtype=np.uint8).tobytes()
-        mask = np.array(mask, dtype=np.float32).tobytes()
-        label = np.array(label, dtype=np.int64).tobytes()
-
-        size = np.array([height, width], dtype=np.int64).tobytes()
+        mask = np.array(mask, dtype=np.int32).tobytes()
+        label = np.array(label, dtype=np.int32).tobytes()
+        size = np.array([height, width], dtype=np.int32).tobytes()
 
         feature = {
             'image': _bytes_feature(image),
