@@ -21,7 +21,7 @@ def decode_data(example):
     example = tf.io.parse_single_example(example, ds_desc)
     image = tf.io.decode_raw(example['image'], tf.uint8)
     label = tf.io.decode_raw(example['label'], tf.int64)
-    mask = tf.io.decode_raw(example['mask'], tf.int64)
+    mask = tf.io.decode_raw(example['mask'], tf.float32)
     size = tf.io.decode_raw(example['size'], tf.int64)
     # convert to float32 and normalize
     image = tf.cast(image, tf.float32) / 255.
@@ -38,10 +38,10 @@ def resize_image(image, mask, label, target_size=TARGET_SIZE, keep_ratio=False):
     method = tf.image.ResizeMethod.BILINEAR
     if keep_ratio:
         image = tf.image.resize(image, target_size, method=method, antialias=True, preserve_aspect_ratio=True)
-        mask = tf.image.resize(mask, target_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR, preserve_aspect_ratio=True)
+        mask = tf.image.resize(mask, target_size, method=method, antialias=True, preserve_aspect_ratio=True)
     else:
         image = tf.image.resize(image, target_size, method=method, antialias=True)
-        mask = tf.image.resize(mask, target_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        mask = tf.image.resize(mask, target_size, method=method, antialias=True)
     return image, mask, label
 
 
@@ -71,6 +71,7 @@ def align_label(label, time_step=TIME_STEPS):
 #     image = tf.image.rgb_to_grayscale(image)
 #     label = align_label(label, time_step)
 #     return image, mask, label
+
 
 def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
     image = tf.image.resize_with_pad(image, target_size[0], target_size[1])
@@ -138,15 +139,11 @@ def get_data(tfrecord, batch_size=32, data_aug=True, n_map_threads=n_map_threads
 
 
 if __name__ == "__main__":
-    import tensorflow_datasets as tfds
-    import os
-    import sys
-    import random
-    import time
-    import glob
-    import math
+    import os, sys, random, time, glob, math
+
     import tqdm
     from PIL import Image
+    import tensorflow_datasets as tfds
 
     batch_size = 8
     time_steps = 16
