@@ -1,5 +1,6 @@
 import os, sys, glob
 
+import yaml
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -9,8 +10,11 @@ sys.path.append("./utils")
 from gen_label import *
 from utils import load_image
 
+cfg = yaml.safe_load(open("config.yaml"))
+TIME_STEPS = cfg["time_steps"]
 
-def gen_mask(bbox, size, len_label, time_step=15):
+
+def gen_mask(bbox, size, len_label, time_step=TIME_STEPS):
     mask = np.zeros((size[0], size[1], time_step), dtype=np.float32)
     h, w = size
 
@@ -111,10 +115,12 @@ def gen_tfrecord(dir_path, file_name):
 
 
 if __name__ == '__main__':
+    # tmp_test = '/Users/haoyu/Documents/datasets/lpr/tmp_test'
     val_path = '/Users/haoyu/Documents/datasets/lpr/val'
     test_path = '/Users/haoyu/Documents/datasets/lpr/test'
     train_path = '/Users/haoyu/Documents/datasets/lpr/train'
 
+    # gen_tfrecord(tmp_test, 'tmp_test')
     gen_tfrecord(val_path, 'val')
     gen_tfrecord(test_path, 'test')
     gen_tfrecord(train_path, 'train')
