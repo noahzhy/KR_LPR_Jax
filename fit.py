@@ -35,7 +35,7 @@ def lr_schedule(lr, steps_per_epoch, epochs=100, warmup=5):
     return optax.warmup_cosine_decay_schedule(
         init_value=lr / 10,
         peak_value=lr,
-        end_value=1e-5,
+        end_value=lr / 100,
         warmup_steps=steps_per_epoch * warmup,
         decay_steps=steps_per_epoch * (epochs - warmup),
     )
