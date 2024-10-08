@@ -1,5 +1,4 @@
 import os, sys, random, time, glob, math
-
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".90"
 
 import jax
@@ -32,16 +31,17 @@ lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 
 
 @jax.jit
-def loss_fn(pred, target):
+def loss_fn(pred, target, step=None):
     pred_mask, pred_feat, pred_ctc = pred
     mask, label = target
 
     loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
-    loss_mask = dice_bce_loss(pred_mask, mask)
+    # loss_mask = dice_bce_loss(pred_mask, mask)
+    loss_mask = tversky_loss(pred_mask, mask)
     loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(
-        state.step <= train_len * 20,
+        step <= train_len * 20,
         lambda x: jnp.array(.0, dtype=jnp.float32),
         lambda x: loss_center,
         None
@@ -61,7 +61,7 @@ def loss_fn(pred, target):
 
 
 def predict(state: TrainState, batch):
-    img, _, label = batch
+    img, (_, label) = batch
     pred_ctc = state.apply_fn({
         'params': state.params,
         'batch_stats': state.batch_stats

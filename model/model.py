@@ -25,6 +25,9 @@ class UpSample(nn.Module):
     @nn.compact
     def __call__(self, x, train=True):
         for idx, _ in enumerate(range(self.up_repeat)):
+            x = jax.image.resize(x,
+                shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]),
+                method="bilinear")
             x = nn.Conv(
                 features=32 * 2 ** (self.up_repeat-idx-1),
                 kernel_size=(3, 3),
@@ -33,10 +36,7 @@ class UpSample(nn.Module):
                 kernel_init=nn.initializers.he_normal(),
                 use_bias=False)(x)
             x = nn.BatchNorm(use_running_average=not train)(x)
-            x = jax.image.resize(x,
-                shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]),
-                method="bilinear")
-            # x = nn.PReLU()(x)
+            x = nn.PReLU()(x)
         return x
 
 

@@ -7,6 +7,19 @@ import optax
 import jax.numpy as jnp
 
 
+# tversky loss
+@jax.jit
+def tversky_loss(logits, targets, beta=0.7, smooth=1e-7):
+    alpha = 1 - beta
+    pred = jax.nn.sigmoid(logits).flatten()
+    true = targets.flatten()
+    tp = jnp.sum(pred * true)
+    fp = jnp.sum(pred * (1 - true))
+    fn = jnp.sum((1 - pred) * true)
+    loss = 1 - (tp + smooth) / (tp + alpha * fp + beta * fn + smooth)
+    return loss.mean()
+
+
 # smooth l1 loss
 @jax.jit
 def smooth_l1_loss(logits, targets, threshold=0.5):
