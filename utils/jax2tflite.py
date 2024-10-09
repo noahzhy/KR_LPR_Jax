@@ -80,7 +80,6 @@ def jax2tflite(key, state, input_shape, dataset, save_path='model.tflite',
 
 
 if __name__ == "__main__":
-    # IMG_SIZE = (1, 64, 128, 1)
     IMG_SIZE = (1, 96, 192, 1)
     SAMPLE_SIZE = 1000
     VAL_DIR = "/Users/haoyu/Documents/datasets/lpr/val"

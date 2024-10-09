@@ -44,7 +44,7 @@ focal_ctc_loss:
   weight: 2.0
   blank_id: *bi
   alpha: 1.0
-  gamma: 0.5
+  gamma: 0.75
 
 center_ctc_loss:
   weight: 0.5

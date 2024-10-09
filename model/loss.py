@@ -7,9 +7,15 @@ import optax
 import jax.numpy as jnp
 
 
+@jax.jit
+def focal_tversky_loss(logits, targets, gamma=0.75):
+    loss_fn = tversky_loss(logits, targets)
+    return jnp.power(1 - loss_fn, gamma)
+
+
 # tversky loss
 @jax.jit
-def tversky_loss(logits, targets, beta=0.7, smooth=1e-7):
+def tversky_loss(logits, targets, beta=0.3, smooth=1e-7):
     alpha = 1 - beta
     pred = jax.nn.sigmoid(logits).flatten()
     true = targets.flatten()

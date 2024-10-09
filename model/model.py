@@ -27,7 +27,7 @@ class UpSample(nn.Module):
         for idx, _ in enumerate(range(self.up_repeat)):
             x = nn.Conv(
                 features=32 * 2 ** (self.up_repeat-idx-1),
-                kernel_size=(3, 3),
+                kernel_size=(5, 5),
                 strides=(1, 1),
                 padding="same",
                 kernel_init=nn.initializers.he_normal(),
@@ -107,7 +107,6 @@ class MobileNetV3Small(nn.Module):
         for i, (k, _in, exp, out, NL, s) in enumerate(self.bnecks):
             x = BottleNeck(_in, exp, out, s, k, NL, self.width_multiplier)(x, train)
 
-        # last
         x = BottleNeck(16, 72, self.out_channels, 1, 5, nn.relu, 1.0)(x, train)
         return x
 

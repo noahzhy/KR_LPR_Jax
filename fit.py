@@ -124,6 +124,7 @@ def fit(state,
     for epoch in range(1, num_epochs + 1):
         pbar = tqdm(train_ds)
         for batch in pbar:
+            batch = jax.tree_map(lambda x: x._numpy(), batch)
             state, loss_dict, opt_state = train_step(state, batch, opt_state, loss_fn)
             lr = opt_state.hyperparams['learning_rate']
             pbar.set_description(f'Epoch {epoch:3d}, lr: {lr:.7f}, loss: {loss_dict["loss"]:.4f}')
@@ -141,6 +142,7 @@ def fit(state,
         elif epoch % eval_freq == 0:
             acc = []
             for batch in test_ds:
+                batch = jax.tree_map(lambda x: x._numpy(), batch)
                 a = eval_step(state, batch)
                 acc.append(a)
             acc = jnp.stack(acc).mean()

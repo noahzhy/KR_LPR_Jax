@@ -10,14 +10,13 @@ print(jax.devices())
 import yaml
 import optax
 import jax.numpy as jnp
-import tensorflow_datasets as tfds
 
 sys.path.append("./utils")
 from model.loss import *
 from model.model import TinyLPR
 from model.dataloader import get_data
-from utils import batch_ctc_greedy_decoder, batch_remove_blank
 from fit import lr_schedule, fit, TrainState, load_ckpt
+from utils import batch_ctc_greedy_decoder, batch_remove_blank
 
 
 cfg = yaml.safe_load(open("config.yaml"))
@@ -25,7 +24,6 @@ print(cfg)
 
 val_ds, _ = get_data(**cfg["val"])
 train_ds, train_len = get_data(**cfg["train"])
-train_dl, val_dl = tfds.as_numpy(train_ds), tfds.as_numpy(val_ds)
 
 lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 
@@ -95,7 +93,7 @@ if __name__ == "__main__":
 
     state = load_ckpt(state, cfg["ckpt"])
 
-    fit(state, train_dl, val_dl,
+    fit(state, train_ds, val_ds,
         loss_fn=loss_fn,
         eval_step=eval_step,
         num_epochs=cfg["epochs"],

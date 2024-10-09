@@ -34,7 +34,7 @@ def decode_label(pred, _dict=label_dict):
 
 
 def predict(state: TrainState, batch):
-    img, _, label = batch
+    img, (_, label) = batch
     pred_ctc = state.apply_fn({
         'params': state.params,
         'batch_stats': state.batch_stats
@@ -48,7 +48,7 @@ def eval_step(state: TrainState, batch):
     pred = batch_ctc_greedy_decoder(pred_ctc)
     acc = jnp.mean(jnp.array([1 if jnp.array_equal(
         l, p) else 0 for l, p in zip(label, pred)]))
-    return state, acc
+    return acc
 
 
 def eval(key, model, input_shape, ckpt_dir, test_val):
@@ -70,7 +70,7 @@ def eval(key, model, input_shape, ckpt_dir, test_val):
 
     acc = []
     for batch in test_ds:
-        _, a = eval_step(state, batch)
+        a = eval_step(state, batch)
         acc.append(a)
     acc = jnp.stack(acc).mean()
     return acc
@@ -130,18 +130,18 @@ if __name__ == "__main__":
     model = TinyLPR(**cfg["model"])
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "weights/best"
+    ckpt_dir = "weights"
 
-    # test_val = "data/val.tfrecord"
-    # acc = eval(key, model, input_shape, ckpt_dir, test_val)
-    # print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
+    test_val = "data/val.tfrecord"
+    acc = eval(key, model, input_shape, ckpt_dir, test_val)
+    print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
 
-    import glob, random
+    # import glob, random
 
-    images = glob.glob("data/val/*.jpg")
-    random.shuffle(images)
-    image_path = images[0]
-    print(image_path)
-    pred = single_test(key, model, input_shape, ckpt_dir, image_path)
-    print(pred)
-    print(decode_label(pred[0]))
+    # images = glob.glob("data/val/*.jpg")
+    # random.shuffle(images)
+    # image_path = images[0]
+    # print(image_path)
+    # pred = single_test(key, model, input_shape, ckpt_dir, image_path)
+    # print(pred)
+    # print(decode_label(pred[0]))
