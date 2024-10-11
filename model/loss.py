@@ -8,6 +8,21 @@ import jax.numpy as jnp
 
 
 @jax.jit
+def ace_loss(logits, targets, blank_id=-1):
+    log_probs = jax.nn.log_softmax(logits, axis=-1)
+    target_log_probs = jnp.take_along_axis(log_probs, targets[..., None], axis=-1).squeeze(-1)
+
+    mask = jnp.where(targets != blank_id, 1.0, 0.0)
+    target_log_probs = target_log_probs * mask
+
+    total_loss = -jnp.sum(target_log_probs)
+    total_elements = jnp.sum(mask)
+
+    ace = total_loss / total_elements
+    return ace
+
+
+@jax.jit
 def focal_tversky_loss(logits, targets, gamma=0.75):
     loss_fn = tversky_loss(logits, targets)
     return jnp.power(1 - loss_fn, gamma)

@@ -10,10 +10,11 @@ lr: 2.0e-3
 warmup: 0
 epochs: 200
 eval_freq: 5
+
 # # funetuning config
 # ckpt: "weights"
 # batch_size: &bs 32
-# lr: 2.0e-4
+# lr: 1.5e-4
 # warmup: 5
 # epochs: 100
 # eval_freq: 5
@@ -37,19 +38,19 @@ model:
 
 # loss config
 ctc_loss:
-  weight: 2.0
+  weight: 1.0
   blank_id: *bi
 
 focal_ctc_loss:
-  weight: 2.0
+  weight: 1.0
   blank_id: *bi
   alpha: 1.0
-  gamma: 0.75
+  gamma: 2.0
 
 center_ctc_loss:
-  weight: 0.5
+  weight: 0.1
   n_class: *nc
   n_feat: *nf
 
 dice_bce_loss:
-  weight: 1.5
+  weight: 2.0
