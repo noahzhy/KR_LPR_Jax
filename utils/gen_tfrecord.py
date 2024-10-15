@@ -1,6 +1,7 @@
 import os, sys, glob
 
 import yaml
+import tqdm
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -13,7 +14,6 @@ from utils import load_image
 cfg = yaml.safe_load(open("config.yaml"))
 TIME_STEPS = cfg["time_steps"]
 
-from tqdm import tqdm
 
 def gen_mask(bbox, size, len_label, time_step=TIME_STEPS):
     mask = np.zeros((size[0], size[1], time_step), dtype=np.int32)
@@ -66,7 +66,7 @@ def gen_tfrecord(dir_path, file_name):
 
     img_ds = glob.glob(dir_path + '/*.jpg')
 
-    for img_path in tqdm(img_ds):
+    for img_path in tqdm.tqdm(img_ds):
         txt_path = img_path.replace('.jpg', '.txt')
         bbox = np.loadtxt(txt_path, dtype=np.int32)
         _, label = gen_label(img_path)

@@ -8,6 +8,7 @@ import jax.numpy as jnp
 
 
 @jax.jit
+<<<<<<< Updated upstream
 def ace_loss(logits, targets, blank_id=-1):
     log_probs = jax.nn.log_softmax(logits, axis=-1)
     target_log_probs = jnp.take_along_axis(log_probs, targets[..., None], axis=-1).squeeze(-1)
@@ -23,6 +24,8 @@ def ace_loss(logits, targets, blank_id=-1):
 
 
 @jax.jit
+=======
+>>>>>>> Stashed changes
 def focal_tversky_loss(logits, targets, gamma=0.75):
     loss_fn = tversky_loss(logits, targets)
     return jnp.power(1 - loss_fn, gamma)

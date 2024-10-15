@@ -24,6 +24,10 @@ print(cfg)
 
 val_ds, _ = get_data(**cfg["val"])
 train_ds, train_len = get_data(**cfg["train"])
+<<<<<<< Updated upstream
+=======
+train_dl, val_dl = train_ds, val_ds
+>>>>>>> Stashed changes
 
 lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 
@@ -41,7 +45,7 @@ def loss_fn(pred, target, step=None):
     loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(
-        step <= train_len * 20,
+        step <= train_len * 15,
         lambda x: jnp.array(.0, dtype=jnp.float32),
         lambda x: loss_center,
         None
@@ -61,6 +65,7 @@ def loss_fn(pred, target, step=None):
     return loss, loss_dict
 
 
+@jax.jit
 def predict(state: TrainState, batch):
     img, (_, label) = batch
     pred_ctc = state.apply_fn({
@@ -70,12 +75,15 @@ def predict(state: TrainState, batch):
     return pred_ctc, label
 
 
+@jax.jit
 def eval_step(state: TrainState, batch):
-    pred_ctc, label = jax.jit(predict)(state, batch)
-    label = batch_remove_blank(label)
+    pred_ctc, label = predict(state, batch)
     pred = batch_ctc_greedy_decoder(pred_ctc)
-    acc = jnp.mean(jnp.array([1 if jnp.array_equal(l, p) else 0 for l, p in zip(label, pred)]))
-    return acc
+    # replace -1 with 0 in label and pred
+    pred = jnp.where(pred == -1, 0, pred)
+    label = jnp.where(label == -1, 0, label)
+    ans = batch_array_comparison(pred, label, size=cfg["max_len"]+1)
+    return jnp.mean(ans)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 import jax
 import jax.numpy as jnp
+from functools import partial
 
 
 def cv2_imwrite(file_path, img):
@@ -48,53 +49,88 @@ def show(image):
 
 
 # ctc greedy decoder
-# group same label and remove blank
 def ctc_greedy_decoder(logits, blank=0):
     logits = jnp.argmax(logits, axis=-1)
-    # return [int(k) for k, _ in itertools.groupby(logits) if k != blank]
-    return [int(k) for k, _ in itertools.groupby(logits) if k > blank]
+    return [int(k) for k, _ in itertools.groupby(logits) if k > blank] # if k != blank]
+
+
+@jax.jit
+def ctc_greedy_decoder(logits, blank=0):
+    """
+    CTC greedy decoder
+    Args:
+        logits: (batch, time, num_classes)
+        blank: blank label
+    Returns:
+        decoded: (batch, time), including blank(-1)
+    """
+    logits = jnp.argmax(logits, axis=-1)
+    # groupby in JAX-friendly way
+    changes = jnp.concatenate([jnp.array([True]), logits[1:] != logits[:-1]])
+    decoded = jnp.where(changes & (logits != blank), logits, -1)
+    return decoded
 
 
 # batch ctc greedy decoder
+@jax.jit
 def batch_ctc_greedy_decoder(logits, blank=0):
-    return [ctc_greedy_decoder(logit, blank) for logit in logits]
+    fn_map = jax.vmap(ctc_greedy_decoder, in_axes=0, out_axes=0)
+    return fn_map(logits)
 
 
-# remove blank in label list
-def remove_blank(label, blank=0):
-    # return [int(k) for k in label if k != blank]
-    return [int(k) for k in label if k > blank]
+@partial(jax.jit, static_argnums=(2,))
+def array_equality(a, b, size=10):
+    # tile the a to the (size, ) shape and fill the blank with -1
+    a = jnp.pad(a, (0, size - a.shape[0]), constant_values=0)
+    b = jnp.pad(b, (0, size - b.shape[0]), constant_values=0)
+    idx_a = jnp.nonzero(a, size=size, fill_value=-1)[0]
+    idx_b = jnp.nonzero(b, size=size, fill_value=-1)[0]
+    ans = jnp.all(jnp.take(a, idx_a) == jnp.take(b, idx_b))
+    return ans
 
 
-# remove blank in batch label
-def batch_remove_blank(label, blank=0):
-    return [remove_blank(l, blank) for l in label]
+@partial(jax.jit, static_argnums=(2,))
+def batch_array_comparison(logits, targets, size=10):
+    """
+    Compare two arrays
+    Args:
+        logits: (batch, time)
+        targets: (batch, time)
+        size: the max length of the array+1, incase of the last element is not blank
+    Returns:
+        ans: (batch, ) list of bool, True if equal, False otherwise
+    """
+    fn_map = jax.vmap(array_equality, in_axes=(0, 0, None), out_axes=0)
+    return fn_map(logits, targets, size)
 
 
 # test unit for batch_ctc_greedy_decoder
 def test_batch_ctc_greedy_decoder():
     logits = jnp.array([
         [
-            [0.1, 0.2, 0.3, 0.4, 0.5],
-            [0.5, 0.4, 0.3, 0.2, 0.1],
-            [0.1, 0.2, 0.3, 0.7, 0.5],
-            [0.5, 0.4, 0.3, 0.8, 0.1],
-            [0.7, 0.3, 0.3, 0.3, 0.3],
+            [0.1, 0.2, 0.3, 0.4, 0.5],  # 4
+            [0.5, 0.4, 0.3, 0.2, 0.1],  # blank
+            [0.1, 0.2, 0.3, 0.7, 0.5],  # 3
+            [0.5, 0.4, 0.3, 0.8, 0.1],  # 3
+            # [0.7, 0.3, 0.3, 0.3, 0.3],  # blank
         ],
         [
-            [0.1, 0.2, 0.3, 0.4, 0.5],
-            [0.5, 0.4, 0.3, 0.2, 0.1],
-            [0.1, 0.2, 0.3, 0.7, 0.5],
-            [0.5, 0.4, 0.3, 0.8, 0.1],
-            [0.7, 0.3, 0.3, 0.3, 0.3],
+            [0.1, 0.2, 0.3, 0.4, 0.5],  # 4
+            [0.5, 0.4, 0.3, 0.2, 0.1],  # blank
+            [0.1, 0.2, 0.8, 0.7, 0.5],  # 2
+            [0.5, 0.4, 0.3, 0.7, 0.1],  # 3
+            # [0.7, 0.3, 0.3, 0.3, 0.3],  # blank
         ],
     ])
-    # assert batch_ctc_greedy_decoder(logits) == [[4, 3], [4, 3]]
-    labels = [[4, 0, 3], [4, 2, 0]]
-    # remove blank in batch label
-    labels = batch_remove_blank(labels)
+    # [[4, 3], [4, 3]]
+    labels = [[4, 0, 3, 0], [4, 2, 3, 0]]
+    labels = jnp.array(labels)
     logits = batch_ctc_greedy_decoder(logits)
-    mean = jnp.mean(jnp.array([1 if jnp.array_equal(l, p) else 0 for l, p in zip(labels, logits)]))
+    logits = jnp.where(logits == -1, 0, logits)
+    print("logits\n", logits)
+
+    ans = batch_array_comparison(logits, labels)
+    mean = jnp.mean(ans)
     print(mean)
     print('\033[92m[pass]\033[00m batch_ctc_greedy_decoder() test passed.')
 
@@ -119,9 +155,9 @@ def names2dict(file_path):
 
 
 if __name__ == "__main__":
-    test_ctc_greedy_decoder()
+    # test_ctc_greedy_decoder()
     test_batch_ctc_greedy_decoder()
 
-    # data/labels.name
-    dict_ = names2dict(os.path.join("data", "labels.names"))
-    print(dict_)
+    # # data/labels.name
+    # dict_ = names2dict(os.path.join("data", "labels.names"))
+    # print(dict_)

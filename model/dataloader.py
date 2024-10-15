@@ -123,6 +123,7 @@ def get_data(tfrecord, batch_size=32, data_aug=True, n_map_threads=n_map_threads
     ds = ds.shuffle(4096, reshuffle_each_iteration=data_aug
         ).batch(batch_size, drop_remainder=True
         ).prefetch(tf.data.experimental.AUTOTUNE)
+
     return ds, ds_len
 
 

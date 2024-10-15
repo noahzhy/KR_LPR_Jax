@@ -13,7 +13,6 @@ import tensorboardX as tbx
 
 key = jax.random.PRNGKey(0)
 
-
 def banner_message(message):
     if isinstance(message, str):
         message = [message]
@@ -39,7 +38,6 @@ def lr_schedule(lr, steps_per_epoch, epochs=100, warmup=5):
         warmup_steps=steps_per_epoch * warmup,
         decay_steps=steps_per_epoch * (epochs - warmup),
     )
-
 
 # implement TrainState
 class TrainState(train_state.TrainState):
@@ -158,6 +156,9 @@ def fit(state,
     if hparams is not None:
         writer.add_hparams(hparams, {'metric/accuracy': best_acc}, name='hparam')
     writer.close()
+
+
+banner_message(["Device > {}".format(", ".join([str(i) for i in jax.devices()]))])
 
 
 if __name__ == "__main__":

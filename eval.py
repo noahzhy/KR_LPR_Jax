@@ -1,15 +1,15 @@
-import time
+import glob, random, time
 from itertools import groupby
 
-import yaml
-import tensorflow as tf
 import jax
-# cpu mode
-jax.config.update('jax_platform_name', 'cpu')
+import yaml
 import optax
 import jax.numpy as jnp
-import tensorflow_datasets as tfds
+import tensorflow as tf
+import orbax.checkpoint as ocp
+import matplotlib.pyplot as plt
 from jamo import h2j, j2hcj, j2h
+import tensorflow_datasets as tfds
 
 from model.model import TinyLPR
 from model.dataloader import get_data
@@ -33,6 +33,7 @@ def decode_label(pred, _dict=label_dict):
     return "".join(pred)
 
 
+@jax.jit
 def predict(state: TrainState, batch):
     img, (_, label) = batch
     pred_ctc = state.apply_fn({
@@ -42,12 +43,20 @@ def predict(state: TrainState, batch):
     return pred_ctc, label
 
 
+@jax.jit
 def eval_step(state: TrainState, batch):
-    pred_ctc, label = jax.jit(predict)(state, batch)
-    label = batch_remove_blank(label)
+    pred_ctc, label = predict(state, batch)
     pred = batch_ctc_greedy_decoder(pred_ctc)
+<<<<<<< Updated upstream
     acc = jnp.mean(jnp.array([1 if jnp.array_equal(
         l, p) else 0 for l, p in zip(label, pred)]))
+=======
+    # replace -1 with 0 in label and pred
+    pred = jnp.where(pred == -1, 0, pred)
+    label = jnp.where(label == -1, 0, label)
+    ans = batch_array_comparison(pred, label, size=cfg["max_len"]+1)
+    acc = jnp.mean(ans)
+>>>>>>> Stashed changes
     return acc
 
 
@@ -88,7 +97,6 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
         tx=optax.inject_hyperparams(optax.nadam)(3e-4),
     )
 
-    import orbax.checkpoint as ocp
     manager = ocp.PyTreeCheckpointer()
     state = manager.restore(ckpt_dir, item=state)
 
@@ -116,7 +124,6 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
     p_mask = jnp.argmax(p_mask, axis=-1)
     p_mask = jnp.expand_dims(p_mask, axis=-1)
 
-    import matplotlib.pyplot as plt
     plt.imshow(p_mask[0])
     plt.show()
 
@@ -125,6 +132,8 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
 
 
 if __name__ == "__main__":
+    # cpu mode
+    jax.config.update('jax_platform_name', 'cpu')
     key = jax.random.PRNGKey(0)
     cfg = yaml.safe_load(open("config.yaml"))
     model = TinyLPR(**cfg["model"])
@@ -136,6 +145,7 @@ if __name__ == "__main__":
     acc = eval(key, model, input_shape, ckpt_dir, test_val)
     print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
 
+<<<<<<< Updated upstream
     # import glob, random
 
     # images = glob.glob("data/val/*.jpg")
@@ -145,3 +155,12 @@ if __name__ == "__main__":
     # pred = single_test(key, model, input_shape, ckpt_dir, image_path)
     # print(pred)
     # print(decode_label(pred[0]))
+=======
+    images = glob.glob("data/val/*.jpg")
+    random.shuffle(images)
+    image_path = images[0]
+    print(image_path)
+    pred = single_test(key, model, input_shape, ckpt_dir, image_path)
+    print(pred)
+    print(decode_label(pred[0]))
+>>>>>>> Stashed changes
