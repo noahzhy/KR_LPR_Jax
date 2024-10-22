@@ -2,18 +2,25 @@ import glob, random, time
 from itertools import groupby
 
 import jax
+# cpu mode
+jax.config.update('jax_platform_name', 'cpu')
 import yaml
 import optax
 import jax.numpy as jnp
 import tensorflow as tf
 import orbax.checkpoint as ocp
+
+# # check obarx version
+# print(ocp.__version__)
+# quit()
+
 import matplotlib.pyplot as plt
 from jamo import h2j, j2hcj, j2h
 import tensorflow_datasets as tfds
 
 from model.model import TinyLPR
 from model.dataloader import get_data
-from utils.utils import batch_ctc_greedy_decoder, batch_remove_blank
+from utils.utils import *
 from fit import lr_schedule, fit, TrainState, load_ckpt
 
 
@@ -50,13 +57,12 @@ def eval_step(state: TrainState, batch):
     # replace -1 with 0 in label and pred
     pred = jnp.where(pred == -1, 0, pred)
     label = jnp.where(label == -1, 0, label)
-    ans = batch_array_comparison(pred, label, size=cfg["max_len"]+1)
-    acc = jnp.mean(ans)
-    return acc
+    ans = batch_array_comparison(pred, label, size=cfg["time_steps"]+1)
+    return jnp.mean(ans)
 
 
 def eval(key, model, input_shape, ckpt_dir, test_val):
-    var = model.init(key, jnp.zeros(input_shape, jnp.float32), train=False)
+    var = model.init(key, jnp.zeros(input_shape, jnp.float32), train=True)
     params = var["params"]
     batch_stats = var["batch_stats"]
 
@@ -64,10 +70,11 @@ def eval(key, model, input_shape, ckpt_dir, test_val):
         apply_fn=model.apply,
         params=params,
         batch_stats=batch_stats,
-        tx=optax.adam(1e-3),
+        tx=optax.inject_hyperparams(optax.nadam)(2e-3),
     )
 
-    state = load_ckpt(state, ckpt_dir)
+    checkpointer = ocp.StandardCheckpointer()
+    state = checkpointer.restore(ckpt_dir, state)
 
     ds, _ = get_data(test_val, batch_size=32, data_aug=False)
     test_ds = tfds.as_numpy(ds)
@@ -134,7 +141,8 @@ if __name__ == "__main__":
     model = TinyLPR(**cfg["model"])
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "weights"
+    # ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/acc_9909_165/default"
+    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/5"
 
     test_val = "data/val.tfrecord"
     acc = eval(key, model, input_shape, ckpt_dir, test_val)

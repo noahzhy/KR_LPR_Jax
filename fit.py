@@ -1,17 +1,17 @@
 import os, time
 from typing import Any
 from functools import partial
+from pathlib import Path
+from flax import nnx
 
 from tqdm import tqdm
 import optax
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
-from flax.training import train_state, orbax_utils
+# from flax.training import train_state, orbax_utils
 import tensorboardX as tbx
 
-
-key = jax.random.PRNGKey(0)
 
 def banner_message(message):
     if isinstance(message, str):
@@ -39,119 +39,117 @@ def lr_schedule(lr, steps_per_epoch, epochs=100, warmup=5):
         decay_steps=steps_per_epoch * (epochs - warmup),
     )
 
-# implement TrainState
-class TrainState(train_state.TrainState):
-    batch_stats: Any
 
-
-@jax.jit
-def loss_fn(logits, labels, step=None):
-    loss = optax.softmax_cross_entropy(logits, jax.nn.one_hot(labels, 10)).mean()
-    loss_dict = {'loss': loss}
-    return loss, loss_dict
-
-
-@jax.jit
-def eval_step(state: TrainState, batch):
+@nnx.jit
+def eval_step(model, batch):
     x, y = batch
-    logits = state.apply_fn({
-        'params': state.params,
-        'batch_stats': state.batch_stats,
-        }, x, train=False)
+    logits = model(x)
     acc = jnp.equal(jnp.argmax(logits, -1), y).mean()
     return acc
 
 
-@partial(jax.jit, static_argnums=(3,))
-def train_step(state: TrainState, batch, opt_state, loss_fn):
+@nnx.jit
+def loss_fn(logits, labels, epoch=None):
+    loss = optax.softmax_cross_entropy(
+        logits=logits,
+        labels=jax.nn.one_hot(labels, 10),
+    ).mean()
+    return loss, {'loss': loss}
+
+
+@partial(nnx.jit, static_argnums=(3,))
+def train_step(model, optimizer: nnx.Optimizer, batch, loss_fn, epoch):
     x, y = batch
-    def compute_loss(params):
-        logits, updates = state.apply_fn(
-            {'params': params, 'batch_stats': state.batch_stats},
-            x,
-            train=True,
-            mutable=['batch_stats'],
-            rngs={'dropout': key}
-        )
-        loss, loss_dict = loss_fn(logits, y, state.step)
-        return loss, (loss_dict, updates)
 
-    (_, (loss_dict, updates)), grads = jax.value_and_grad(compute_loss, has_aux=True)(state.params)
-    state = state.apply_gradients(grads=grads, batch_stats=updates['batch_stats'])
-    _, opt_state = state.tx.update(grads, opt_state)
-    return state, loss_dict, opt_state
+    def compute_loss(model):
+        logits = model(x)
+        return loss_fn(logits, y, epoch)
+
+    grad_fn = nnx.value_and_grad(compute_loss, has_aux=True)
+    (loss, loss_dict), grads = grad_fn(model)
+    optimizer.update(grads)
+    return loss_dict
 
 
-def load_ckpt(state, ckpt_dir, step=None):
+def load_ckpt(model, ckpt_dir, epoch=None):
     if ckpt_dir is None or not os.path.exists(ckpt_dir):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
         return state
 
     ckpt_dir = os.path.abspath(ckpt_dir)
-    step = step or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
+    epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
 
-    ckpt_path = os.path.join(ckpt_dir, str(step), "default")
-    manager = ocp.PyTreeCheckpointer()
-    return manager.restore(ckpt_path, item=state)
+    checkpointer = ocp.StandardCheckpointer()
+    ckpt_path = os.path.join(ckpt_dir, str(epoch))
+    # model = nnx.eval_shape(lambda: Model(nnx.Rngs(0)))
+    graphdef, abstract_state = nnx.split(model)
+
+    state_restored = checkpointer.restore(ckpt_path, abstract_state)
+    model = nnx.merge(graphdef, state_restored)
+    return model
 
 
-def fit(state,
+def fit(model,
         train_ds, test_ds,
-        num_epochs=100,
+        optimizer:nnx.Optimizer,
         loss_fn=loss_fn,
+        num_epochs=100,
         eval_step=None,
         eval_freq=1,
         log_name='default',
         hparams=None,
     ):
-    ckpt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "checkpoints"))
-    # checkpoint manager see https://flax.readthedocs.io/en/latest/guides/training_techniques/use_checkpointing.html#with-orbax
-    options = ocp.CheckpointManagerOptions(
-        create=True,
-        max_to_keep=1,
-        save_interval_steps=eval_freq,
-    )
-    manager = ocp.CheckpointManager(ckpt_path, options=options)
     # logging
     banner_message(["Start training", "Device > {}".format(", ".join([str(i) for i in jax.devices()]))])
-    timestamp = time.strftime("%m%d%H%M%S")
-    writer = tbx.SummaryWriter("logs/{}_{}".format(log_name, timestamp))
-    opt_state = state.tx.init(state.params)
-    best_acc = .0
+
+    Path("checkpoints").mkdir(exist_ok=True, parents=True)
+    ckpt_path = os.path.abspath("checkpoints")
+    checkpointer = ocp.StandardCheckpointer()
+
+    writer = tbx.SummaryWriter("logs/{}_{}".format(log_name, time.strftime("%m%d%H%M%S")))
+    best_acc = -1
     # start training
     for epoch in range(1, num_epochs + 1):
+        model.train()
         pbar = tqdm(train_ds)
         for batch in pbar:
+            # print(lr)
+            ## if batch is not from tfds.as_numpy, convert it to numpy
             batch = jax.tree_map(lambda x: x._numpy(), batch)
-            state, loss_dict, opt_state = train_step(state, batch, opt_state, loss_fn)
-            lr = opt_state.hyperparams['learning_rate']
+            loss_dict = train_step(model, optimizer, batch, loss_fn, epoch)
+            lr = 0.1
+            # print(lr)
             pbar.set_description(f'Epoch {epoch:3d}, lr: {lr:.7f}, loss: {loss_dict["loss"]:.4f}')
 
-            if state.step % 10 == 0 or state.step == 1:
-                writer.add_scalar('train/learning_rate', lr, state.step)
-                for k, v in loss_dict.items():
-                    writer.add_scalar(f'train/{k}', v, state.step)
+            # if state.step % 10 == 0 or state.step == 1:
+            writer.add_scalar('train/learning_rate', lr, epoch)
+            for k, v in loss_dict.items():
+                writer.add_scalar(f'train/{k}', v, epoch)
 
             writer.flush()
 
         if eval_step is None:
-            manager.save(epoch, args=ocp.args.StandardSave(state))
+            _, state = nnx.split(model)
+            checkpointer.save(os.path.join(ckpt_path, str(epoch)), state)
 
         elif epoch % eval_freq == 0:
             acc = []
+            model.eval()
             for batch in test_ds:
+                ## if batch is not from tfds.as_numpy, convert it to numpy
                 batch = jax.tree_map(lambda x: x._numpy(), batch)
-                a = eval_step(state, batch)
+                a = eval_step(model, batch)
                 acc.append(a)
+
             acc = jnp.stack(acc).mean()
             pbar.write(f'Epoch {epoch:3d}, test acc: {acc:.4f}')
             writer.add_scalar('test/accuracy', acc, epoch)
 
             if acc > best_acc:
-                manager.save(epoch, args=ocp.args.StandardSave(state), metrics={'accuracy': acc})
+                _, state = nnx.split(model)
+                checkpointer.save(os.path.join(ckpt_path, str(epoch)), state)
                 best_acc = acc
 
-    manager.wait_until_finished()
     banner_message(["Training finished", f"Best test acc: {best_acc:.6f}"])
     if hparams is not None:
         writer.add_hparams(hparams, {'metric/accuracy': best_acc}, name='hparam')
@@ -189,37 +187,27 @@ if __name__ == "__main__":
     test_ds = get_test_batches(batch_size=config['batch_size'])
     lr_fn = lr_schedule(lr=config['lr'], steps_per_epoch=len(train_ds), epochs=config['num_epochs'], warmup=config['warmup'])
 
-    key = jax.random.PRNGKey(0)
-    model = Model()
+    key = nnx.Rngs(0)
+    model = Model(key)
     x = jnp.ones((1, 28, 28, 1))
-    var = model.init(key, x, train=True)
 
-    state = TrainState.create(
-        apply_fn=model.apply,
-        params=var['params'],
-        batch_stats=var['batch_stats'],
-        tx=optax.inject_hyperparams(optax.adam)(lr_fn),
-    )
+    optimizer = nnx.Optimizer(model, optax.nadam(lr_fn))
 
-    import time
-    start = time.perf_counter()
+    # fit(model, train_ds, test_ds,
+    #     optimizer=optimizer,
+    #     loss_fn=loss_fn,
+    #     eval_step=eval_step,
+    #     eval_freq=1,
+    #     num_epochs=config['num_epochs'],
+    #     hparams=config,
+    #     log_name='mnist')
 
-    fit(state, train_ds, test_ds,
-        # train_step=train_step,
-        loss_fn=loss_fn,
-        eval_step=eval_step,
-        eval_freq=1,
-        num_epochs=config['num_epochs'],
-        hparams=config,
-        log_name='mnist')
-
-    print("Elapsed time: {} ms".format((time.perf_counter() - start) * 1000))
-
-    state = load_ckpt(state, "./checkpoints")
+    model = load_ckpt(model, "./checkpoints")
 
     acc = []
+    model.eval()
     for batch in test_ds:
-        a = eval_step(state, batch)
+        a = eval_step(model, batch)
         acc.append(a)
     acc = jnp.stack(acc).mean()
 
