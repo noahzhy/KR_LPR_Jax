@@ -24,10 +24,6 @@ print(cfg)
 
 val_ds, _ = get_data(**cfg["val"])
 train_ds, train_len = get_data(**cfg["train"])
-<<<<<<< Updated upstream
-=======
-train_dl, val_dl = train_ds, val_ds
->>>>>>> Stashed changes
 
 lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 

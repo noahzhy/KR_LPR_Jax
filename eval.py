@@ -47,16 +47,11 @@ def predict(state: TrainState, batch):
 def eval_step(state: TrainState, batch):
     pred_ctc, label = predict(state, batch)
     pred = batch_ctc_greedy_decoder(pred_ctc)
-<<<<<<< Updated upstream
-    acc = jnp.mean(jnp.array([1 if jnp.array_equal(
-        l, p) else 0 for l, p in zip(label, pred)]))
-=======
     # replace -1 with 0 in label and pred
     pred = jnp.where(pred == -1, 0, pred)
     label = jnp.where(label == -1, 0, label)
     ans = batch_array_comparison(pred, label, size=cfg["max_len"]+1)
     acc = jnp.mean(ans)
->>>>>>> Stashed changes
     return acc
 
 
@@ -145,7 +140,6 @@ if __name__ == "__main__":
     acc = eval(key, model, input_shape, ckpt_dir, test_val)
     print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
 
-<<<<<<< Updated upstream
     # import glob, random
 
     # images = glob.glob("data/val/*.jpg")
@@ -155,12 +149,3 @@ if __name__ == "__main__":
     # pred = single_test(key, model, input_shape, ckpt_dir, image_path)
     # print(pred)
     # print(decode_label(pred[0]))
-=======
-    images = glob.glob("data/val/*.jpg")
-    random.shuffle(images)
-    image_path = images[0]
-    print(image_path)
-    pred = single_test(key, model, input_shape, ckpt_dir, image_path)
-    print(pred)
-    print(decode_label(pred[0]))
->>>>>>> Stashed changes
