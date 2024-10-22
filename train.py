@@ -36,25 +36,23 @@ def loss_fn(pred, target, step=None):
     # loss_ctc = focal_ctc_loss(pred_ctc, label, **cfg["focal_ctc_loss"])
     # loss_mask = dice_bce_loss(pred_mask, mask)
     loss_ctc = ctc_loss(pred_ctc, label, **cfg["ctc_loss"]).mean()
-    loss_ace = ace_loss(pred_ctc, label)
     loss_mask = tversky_loss(pred_mask, mask)
     loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(
-        step <= train_len * 15,
+        step <= train_len * 20,
         lambda x: jnp.array(.0, dtype=jnp.float32),
         lambda x: loss_center,
         None
     )
 
-    loss = (cfg["focal_ctc_loss"]["weight"] * loss_ctc + 0.1 * loss_ace +
+    loss = (cfg["focal_ctc_loss"]["weight"] * loss_ctc +
             cfg["dice_bce_loss"]["weight"]  * loss_mask +
             cfg["center_ctc_loss"]["weight"]* loss_center)
 
     loss_dict = {
         'loss': loss,
         'loss_ctc': loss_ctc,
-        'loss_ace': loss_ace,
         'loss_mask': loss_mask,
         'loss_center': loss_center,
     }
