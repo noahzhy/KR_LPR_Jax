@@ -75,16 +75,12 @@ def train_step(model, optimizer: nnx.Optimizer, batch, loss_fn, epoch):
 def load_ckpt(model, ckpt_dir, epoch=None):
     if ckpt_dir is None or not os.path.exists(ckpt_dir):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
-        return state
-
-    ckpt_path = os.path.abspath(ckpt_dir)
-    # epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
+        return model
 
     checkpointer = ocp.StandardCheckpointer()
-    # ckpt_path = os.path.join(ckpt_path, str(epoch))
-    # model = nnx.eval_shape(lambda: Model(nnx.Rngs(0)))
     graphdef, abstract_state = nnx.split(model)
 
+    ckpt_path = os.path.abspath(ckpt_dir)
     state_restored = checkpointer.restore(ckpt_path, abstract_state)
     model = nnx.merge(graphdef, state_restored)
     return model
@@ -114,7 +110,6 @@ def fit(model,
         model.train()
         pbar = tqdm(train_ds)
         for batch in pbar:
-            # print(lr)
             ## if batch is not from tfds.as_numpy, convert it to numpy
             batch = jax.tree_map(lambda x: x._numpy(), batch)
             loss_dict = train_step(model, optimizer, batch, loss_fn, epoch)
@@ -123,7 +118,7 @@ def fit(model,
             pbar.set_description(f'Epoch {epoch:3d}, lr: {lr:.7f}, loss: {loss_dict["loss"]:.4f}')
 
             # if state.step % 10 == 0 or state.step == 1:
-            writer.add_scalar('train/learning_rate', lr, epoch)
+            # writer.add_scalar('train/learning_rate', lr, epoch)
             for k, v in loss_dict.items():
                 writer.add_scalar(f'train/{k}', v, epoch)
 
@@ -142,7 +137,7 @@ def fit(model,
                 a = eval_step(model, batch)
                 acc.append(a)
 
-            acc = jnp.stack(acc).mean()
+            acc = 0 if len(acc) == 0 else jnp.stack(acc).mean()
             pbar.write(f'Epoch {epoch:3d}, test acc: {acc:.4f}')
             writer.add_scalar('test/accuracy', acc, epoch)
 

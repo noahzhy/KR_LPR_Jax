@@ -59,28 +59,17 @@ def eval_step(model, batch):
 
 
 def eval(key, model, input_shape, ckpt_dir, test_val):
-    # var = model.init(key, jnp.zeros(input_shape, jnp.float32), train=True)
-    # params = var["params"]
-    # batch_stats = var["batch_stats"]
-
-    # state = TrainState.create(
-    #     apply_fn=model.apply,
-    #     params=params,
-    #     batch_stats=batch_stats,
-    #     tx=optax.inject_hyperparams(optax.nadam)(2e-3),
-    # )
-
-    state = load_ckpt(model, ckpt_dir)
+    model = load_ckpt(model, ckpt_dir)
 
     ds, _ = get_data(test_val, batch_size=32, data_aug=False)
     test_ds = tfds.as_numpy(ds)
 
     acc = []
     for batch in test_ds:
-        a = eval_step(state, batch)
+        a = eval_step(model, batch)
         acc.append(a)
-    acc = jnp.stack(acc).mean()
-    return acc
+
+    return 0 if len(acc) == 0 else jnp.stack(acc).mean()
 
 
 def single_test(key, model, input_shape, ckpt_dir, image_path):
@@ -137,9 +126,9 @@ if __name__ == "__main__":
     model = TinyLPR(**cfg["model"], rngs=key)
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/5.orbax-checkpoint-tmp-0"
+    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/1"
 
-    test_val = "data/val.tfrecord"
+    test_val = "data/tmp_test.tfrecord"
     acc = eval(key, model, input_shape, ckpt_dir, test_val)
     print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
 

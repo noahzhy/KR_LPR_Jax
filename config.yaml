@@ -5,7 +5,7 @@ blank_id: &bi -1
 
 # training config
 ckpt: ""
-batch_size: &bs 2
+batch_size: &bs 128
 lr: 2.0e-3
 warmup: 0
 epochs: 200
@@ -22,12 +22,12 @@ eval_freq: 5
 # data config
 train:
   batch_size: *bs
-  tfrecord: "data/tmp_test.tfrecord"
+  tfrecord: "/home/ubuntu/datasets/lpr/train.tfrecord"
   data_aug: True
 
 val:
   batch_size: *bs
-  tfrecord: "data/tmp_test.tfrecord"
+  tfrecord: "/home/ubuntu/datasets/lpr/val.tfrecord"
   data_aug: False
 
 # model config
@@ -38,14 +38,14 @@ model:
 
 # loss config
 ctc_loss:
-  weight: 1.0
+  weight: 2.0
   blank_id: *bi
 
-focal_ctc_loss:
-  weight: 1.0
-  blank_id: *bi
-  alpha: 1.0
-  gamma: 2.0
+# focal_ctc_loss:
+#   weight: 2.0
+#   blank_id: *bi
+#   alpha: 1.0
+#   gamma: 2.0
 
 center_ctc_loss:
   weight: 0.1
@@ -53,4 +53,4 @@ center_ctc_loss:
   n_feat: *nf
 
 dice_bce_loss:
-  weight: 2.0
+  weight: 1.5

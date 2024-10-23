@@ -20,8 +20,8 @@ def _make_divisible(v, divisor, min_value=16):
 
 
 class UpSample(nnx.Module):
-    def __init__(self, in_feats, out_feats, rngs: nnx.Rngs, method="nearest"):
-        self.method = method
+
+    def __init__(self, in_feats, out_feats, rngs: nnx.Rngs):
         self.conv0 = nnx.Conv(
             in_features=in_feats, out_features=32,
             kernel_size=(5, 5),
@@ -62,15 +62,16 @@ class UpSample(nnx.Module):
 
     def __call__(self, x):
         x = self.bn0(self.conv0(x))
-        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method=self.method)
+        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn1(self.conv1(x))
-        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method=self.method)
+        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn2(self.conv2(x))
-        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method=self.method)
+        x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         return self.last_conv(x)
 
 
 class BottleNeck(nnx.Module):
+
     def __init__(self, in_size, exp_size, out_size, s, k, activation, scale, rngs: nnx.Rngs):
         self.activation = activation
 
@@ -109,16 +110,9 @@ class BottleNeck(nnx.Module):
         self.bn2 = nnx.BatchNorm(num_features=out, rngs=rngs)
 
     def __call__(self, inputs):
-        x = self.conv0(inputs)
-        x = self.bn0(x)
-        x = self.activation(x)
-
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
-
-        x = self.conv2(x)
-        x = self.bn2(x)        
+        x = self.activation(self.bn0(self.conv0(inputs)))
+        x = self.activation(self.bn1(self.conv1(x)))
+        x = self.bn2(self.conv2(x))
 
         if self.s == 1 and self._in == self.out:
             x = jnp.add(x, inputs)
@@ -128,19 +122,9 @@ class BottleNeck(nnx.Module):
 
 class MobileNetV3Small(nnx.Module):
 
-    def __init__(self, width_multiplier, out_channels, rngs: nnx.Rngs):
-        self.width_multiplier = width_multiplier
-        self.rngs = rngs
-        self.bnecks = [
-            # k  in    exp     out      NL          s
-            [3,  16,    16,     16,     nnx.relu,    2],
-            [3,  16,    72,     24,     nnx.relu,    1],
-            [3,  24,    88,     24,     nnx.relu,    1],
-            [5,  24,    96,     40,     nnx.relu,    2],
-            [5,  40,    240,    40,     nnx.relu,    1],
-            [5,  40,    120,    48,     nnx.relu,    1],
-            [5,  48,    144,    48,     nnx.relu,    1],
-        ]
+    def __init__(self, scale, out_channels, rngs: nnx.Rngs):
+        # self.scale = scale
+
         self.conv0 = nnx.Conv(in_features=1, out_features=16,
             kernel_size=(3, 3),
             strides=(2, 2),
@@ -149,16 +133,39 @@ class MobileNetV3Small(nnx.Module):
             use_bias=False,
             rngs=rngs)
         self.bn0 = nnx.BatchNorm(num_features=16, rngs=rngs)
+
+        # # k  in    exp     out      NL          s
+        # [3,  16,    16,     16,     nnx.relu,    2],
+        # [3,  16,    72,     24,     nnx.relu,    1],
+        # [3,  24,    88,     24,     nnx.relu,    1],
+        # [5,  24,    96,     40,     nnx.relu,    2],
+        # [5,  40,    240,    40,     nnx.relu,    1],
+        # [5,  40,    120,    48,     nnx.relu,    1],
+        # [5,  48,    144,    48,     nnx.relu,    1],
+        self.bneck0 = BottleNeck(16, 16, 16, 2, 3, nnx.relu, scale, rngs)
+        self.bneck1 = BottleNeck(16, 72, 24, 1, 3, nnx.relu, scale, rngs)
+        self.bneck2 = BottleNeck(24, 88, 24, 1, 3, nnx.relu, scale, rngs)
+        self.bneck3 = BottleNeck(24, 96, 40, 2, 5, nnx.relu, scale, rngs)
+        self.bneck4 = BottleNeck(40, 240, 40, 1, 5, nnx.relu, scale, rngs)
+        self.bneck5 = BottleNeck(40, 120, 48, 1, 5, nnx.relu, scale, rngs)
+        self.bneck6 = BottleNeck(48, 144, 48, 1, 5, nnx.relu, scale, rngs)
+
         self.last = BottleNeck(16, 72, out_channels, 1, 5, nnx.relu, 1.0, rngs)
 
     def __call__(self, x):
         # 64, 128, 1
-        x = self.conv0(x)
-        x = self.bn0(x)
-        x = nnx.relu(x)
+        x = nnx.relu(self.bn0(self.conv0(x)))
 
-        for i, (k, _in, exp, out, NL, s) in enumerate(self.bnecks):
-            x = BottleNeck(_in, exp, out, s, k, NL, self.width_multiplier, self.rngs)(x)
+        x = self.bneck0(x)
+        x = self.bneck1(x)
+        x = self.bneck2(x)
+        x = self.bneck3(x)
+        x = self.bneck4(x)
+        x = self.bneck5(x)
+        x = self.bneck6(x)
+
+        # for i, (k, _in, exp, out, NL, s) in enumerate(bnecks):
+        #     x = BottleNeck(_in, exp, out, s, k, NL, self.width_multiplier, self.rngs)(x)
 
         x = self.last(x)
         return x
@@ -223,7 +230,6 @@ class Attention(nnx.Module):
         )
 
     def __call__(self, inputs):
-
         _channel = self.channel_attention(inputs)
         _spatial = self.spatial_attention(_channel)
 
@@ -241,20 +247,12 @@ class Attention(nnx.Module):
 class TinyLPR(nnx.Module):
 
     def __init__(self, time_steps, n_class, n_feat, rngs: nnx.Rngs):
-        self.time_steps = time_steps
-        self.n_class = n_class
-        self.n_feat = n_feat
-        self.rngs = rngs
-
         self.backbone = MobileNetV3Small(0.25, n_feat, rngs)
         self.attention = Attention(n_feat, time_steps, rngs)
-        self.dense = nnx.Linear(
-            in_features=n_feat,
-            out_features=n_class,
+        self.dense = nnx.Linear(in_features=n_feat, out_features=n_class,
             kernel_init=nnx.initializers.kaiming_normal(),
             use_bias=True,
-            rngs=rngs
-        )
+            rngs=rngs)
 
         self.up = UpSample(time_steps, time_steps, rngs)
 
@@ -274,17 +272,29 @@ class TinyLPR(nnx.Module):
 
 if __name__ == '__main__':
     # jax cpu
-    # jax.config.update("jax_platform_name", "cpu")
-    model = TinyLPR(time_steps=16, n_class=68, n_feat=64, rngs=nnx.Rngs(0))
+    jax.config.update("jax_platform_name", "cpu")
+    key = nnx.Rngs(0)
+    model = TinyLPR(time_steps=16, n_class=68, n_feat=64, rngs=key)
     x = jnp.zeros((1, 96, 192, 1))
-    # y = model(x)
+    y = model(x)
+    for i in y:
+        print(i.shape)
 
     import orbax.checkpoint as ocp
     _, state = nnx.split(model)
-    # nnx.display(state)
 
     checkpointer = ocp.StandardCheckpointer()
-    checkpointer.save("/Users/haoyu/Documents/Projects/LPR_Jax/checkpoint0/", state)
+    ckpt_path = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/"
+    checkpointer.save(ckpt_path, state, force=True)
 
-    # for i in y:
-    #     print(i.shape)
+    # ckpt_path = os.path.join(ckpt_path, str(epoch))
+    # model = nnx.eval_shape(lambda: Model(nnx.Rngs(0)))
+    graphdef, abstract_state = nnx.split(model)
+
+    state_restored = checkpointer.restore(ckpt_path, abstract_state)
+    model = nnx.merge(graphdef, state_restored)
+    x = jnp.zeros((1, 96, 192, 1))
+    y = model(x)
+    for i in y:
+        print(i.shape)
+    # return model
