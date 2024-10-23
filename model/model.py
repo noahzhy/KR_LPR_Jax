@@ -33,10 +33,11 @@ class UpSample(nn.Module):
                 kernel_init=nn.initializers.he_normal(),
                 use_bias=False)(x)
             x = nn.BatchNorm(use_running_average=not train)(x)
+            x = nn.PReLU()(x)
             x = jax.image.resize(x,
                 shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]),
                 method="bilinear")
-            # x = nn.PReLU()(x)
+            # 
         return x
 
 
@@ -187,6 +188,7 @@ class TinyLPR(nn.Module):
         self.dense = nn.Dense(
             features=self.n_class,
             kernel_init=nn.initializers.kaiming_normal(),
+            use_bias=True
         )
 
     @nn.compact

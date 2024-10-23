@@ -16,7 +16,7 @@ from model.loss import *
 from model.model import TinyLPR
 from model.dataloader import get_data
 from fit import lr_schedule, fit, TrainState, load_ckpt
-from utils import batch_ctc_greedy_decoder, batch_remove_blank
+from utils import *
 
 
 cfg = yaml.safe_load(open("config.yaml"))
@@ -46,7 +46,7 @@ def loss_fn(pred, target, step=None):
         None
     )
 
-    loss = (cfg["focal_ctc_loss"]["weight"] * loss_ctc +
+    loss = (cfg["ctc_loss"]["weight"] * loss_ctc +
             cfg["dice_bce_loss"]["weight"]  * loss_mask +
             cfg["center_ctc_loss"]["weight"]* loss_center)
 
@@ -76,7 +76,7 @@ def eval_step(state: TrainState, batch):
     # replace -1 with 0 in label and pred
     pred = jnp.where(pred == -1, 0, pred)
     label = jnp.where(label == -1, 0, label)
-    ans = batch_array_comparison(pred, label, size=cfg["max_len"]+1)
+    ans = batch_array_comparison(pred, label, size=cfg["time_steps"]+1)
     return jnp.mean(ans)
 
 
