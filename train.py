@@ -61,7 +61,6 @@ def loss_fn(pred, target, epoch=None):
 @nnx.jit
 def predict(model, batch):
     img, (_, label) = batch
-    model.eval()
     pred_ctc = model(img, train=False)
     return pred_ctc, label
 

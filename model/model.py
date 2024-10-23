@@ -274,27 +274,17 @@ class TinyLPR(nnx.Module):
 
 if __name__ == '__main__':
     # jax cpu
-    jax.config.update("jax_platform_name", "cpu")
+    # jax.config.update("jax_platform_name", "cpu")
     model = TinyLPR(time_steps=16, n_class=68, n_feat=64, rngs=nnx.Rngs(0))
     x = jnp.zeros((1, 96, 192, 1))
     # y = model(x)
 
-    # model.train()
-    # Pass in the arguments, not an actual module
-    model = nnx.bridge.to_linen(TinyLPR, time_steps=16, n_class=68, n_feat=64, rngs=nnx.Rngs(0))
-    variables = model.init(jax.random.key(0), x)
-    y = model.apply(variables, x)
-    for i in y:
-        print(i.shape)
+    import orbax.checkpoint as ocp
+    _, state = nnx.split(model)
+    # nnx.display(state)
 
-    from flax import linen as nn
-    key = jax.random.PRNGKey(0)
-    tabulate_fn = nn.tabulate(
-        model, key, compute_flops=True, compute_vjp_flops=True)
-    print(tabulate_fn(x))
-
-    # check model output
-
+    checkpointer = ocp.StandardCheckpointer()
+    checkpointer.save("/Users/haoyu/Documents/Projects/LPR_Jax/checkpoint0/", state)
 
     # for i in y:
     #     print(i.shape)

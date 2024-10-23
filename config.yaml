@@ -5,7 +5,7 @@ blank_id: &bi -1
 
 # training config
 ckpt: ""
-batch_size: &bs 128
+batch_size: &bs 2
 lr: 2.0e-3
 warmup: 0
 epochs: 200
@@ -22,12 +22,12 @@ eval_freq: 5
 # data config
 train:
   batch_size: *bs
-  tfrecord: "/home/ubuntu/datasets/lpr/train.tfrecord"
+  tfrecord: "data/tmp_test.tfrecord"
   data_aug: True
 
 val:
   batch_size: *bs
-  tfrecord: "/home/ubuntu/datasets/lpr/val.tfrecord"
+  tfrecord: "data/tmp_test.tfrecord"
   data_aug: False
 
 # model config

@@ -9,6 +9,7 @@ import optax
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
+import orbax
 # from flax.training import train_state, orbax_utils
 import tensorboardX as tbx
 
@@ -76,11 +77,11 @@ def load_ckpt(model, ckpt_dir, epoch=None):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
         return state
 
-    ckpt_dir = os.path.abspath(ckpt_dir)
-    epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
+    ckpt_path = os.path.abspath(ckpt_dir)
+    # epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
 
     checkpointer = ocp.StandardCheckpointer()
-    ckpt_path = os.path.join(ckpt_dir, str(epoch))
+    # ckpt_path = os.path.join(ckpt_path, str(epoch))
     # model = nnx.eval_shape(lambda: Model(nnx.Rngs(0)))
     graphdef, abstract_state = nnx.split(model)
 
@@ -147,7 +148,7 @@ def fit(model,
 
             if acc > best_acc:
                 _, state = nnx.split(model)
-                checkpointer.save(os.path.join(ckpt_path, str(epoch)), state)
+                checkpointer.save(os.path.join(ckpt_path, str(epoch)), state, force=True)
                 best_acc = acc
 
     banner_message(["Training finished", f"Best test acc: {best_acc:.6f}"])

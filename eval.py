@@ -21,7 +21,7 @@ import tensorflow_datasets as tfds
 from model.model import TinyLPR
 from model.dataloader import get_data
 from utils.utils import *
-from fit import lr_schedule, fit, TrainState, load_ckpt
+from fit import *
 
 
 def load_dict(dict_path='data/labels.names'):
@@ -40,19 +40,16 @@ def decode_label(pred, _dict=label_dict):
     return "".join(pred)
 
 
-@jax.jit
-def predict(state: TrainState, batch):
+@nnx.jit
+def predict(model, batch):
     img, (_, label) = batch
-    pred_ctc = state.apply_fn({
-        'params': state.params,
-        'batch_stats': state.batch_stats
-        }, img, train=False)
+    pred_ctc = model(img, train=False)
     return pred_ctc, label
 
 
-@jax.jit
-def eval_step(state: TrainState, batch):
-    pred_ctc, label = predict(state, batch)
+@nnx.jit
+def eval_step(model, batch):
+    pred_ctc, label = predict(model, batch)
     pred = batch_ctc_greedy_decoder(pred_ctc)
     # replace -1 with 0 in label and pred
     pred = jnp.where(pred == -1, 0, pred)
@@ -62,19 +59,18 @@ def eval_step(state: TrainState, batch):
 
 
 def eval(key, model, input_shape, ckpt_dir, test_val):
-    var = model.init(key, jnp.zeros(input_shape, jnp.float32), train=True)
-    params = var["params"]
-    batch_stats = var["batch_stats"]
+    # var = model.init(key, jnp.zeros(input_shape, jnp.float32), train=True)
+    # params = var["params"]
+    # batch_stats = var["batch_stats"]
 
-    state = TrainState.create(
-        apply_fn=model.apply,
-        params=params,
-        batch_stats=batch_stats,
-        tx=optax.inject_hyperparams(optax.nadam)(2e-3),
-    )
+    # state = TrainState.create(
+    #     apply_fn=model.apply,
+    #     params=params,
+    #     batch_stats=batch_stats,
+    #     tx=optax.inject_hyperparams(optax.nadam)(2e-3),
+    # )
 
-    checkpointer = ocp.StandardCheckpointer()
-    state = checkpointer.restore(ckpt_dir, state)
+    state = load_ckpt(model, ckpt_dir)
 
     ds, _ = get_data(test_val, batch_size=32, data_aug=False)
     test_ds = tfds.as_numpy(ds)
@@ -136,13 +132,12 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
 if __name__ == "__main__":
     # cpu mode
     jax.config.update('jax_platform_name', 'cpu')
-    key = jax.random.PRNGKey(0)
     cfg = yaml.safe_load(open("config.yaml"))
-    model = TinyLPR(**cfg["model"])
+    key = nnx.Rngs(0)
+    model = TinyLPR(**cfg["model"], rngs=key)
 
     input_shape = (1, *cfg["img_size"], 1)
-    # ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/acc_9909_165/default"
-    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/5"
+    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/5.orbax-checkpoint-tmp-0"
 
     test_val = "data/val.tfrecord"
     acc = eval(key, model, input_shape, ckpt_dir, test_val)

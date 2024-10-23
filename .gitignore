@@ -1,6 +1,7 @@
 checkpoints/*
 logs/*
 tmp/*
+weights/*
 
 *.png
 *.jpg
