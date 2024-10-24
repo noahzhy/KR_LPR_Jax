@@ -2,6 +2,7 @@ import os, sys, random, glob
 
 import jax
 import flax
+from flax import nnx
 import tensorflow as tf
 import jax.numpy as jnp
 from jax.experimental import jax2tf
@@ -35,10 +36,7 @@ def jax2tflite(key, state, input_shape, dataset, save_path='model.tflite',
                inference_output_type=tf.uint8):
 
     def predict(input_img):
-        return state.apply_fn({
-            'params': state.params,
-            'batch_stats': state.batch_stats
-        }, input_img, train=False)
+        return state.apply_fn(params, other_variables)(input_img)[0]
 
     tf_predict = tf.function(
         jax2tf.convert(predict, enable_xla=False),
@@ -79,6 +77,21 @@ def jax2tflite(key, state, input_shape, dataset, save_path='model.tflite',
     print('\033[92m[done]\033[00m Model converted to tflite.')
 
 
+def load_ckpt(model, ckpt_dir):
+    if ckpt_dir is None or not os.path.exists(ckpt_dir):
+        banner_message(["No checkpoint was loaded", "Training from scratch"])
+        return model
+
+    import orbax.checkpoint as ocp
+    checkpointer = ocp.StandardCheckpointer()
+    graphdef, abstract_state = nnx.split(model)
+
+    ckpt_path = os.path.abspath(ckpt_dir)
+    state_restored = checkpointer.restore(ckpt_path, abstract_state)
+    model = nnx.merge(graphdef, state_restored)
+    return model
+
+
 if __name__ == "__main__":
     IMG_SIZE = (1, 96, 192, 1)
     SAMPLE_SIZE = 1000
@@ -88,30 +101,31 @@ if __name__ == "__main__":
     import sys
     import yaml
     import optax
-    sys.path.append("./")
-    from fit import TrainState, load_ckpt
+    from flax.training import train_state
+
+
+    sys.path.append("../")
+    # from fit import TrainState, load_ckpt
 
     cfg = yaml.safe_load(open("config.yaml"))
 
-    key = jax.random.PRNGKey(0)
+    key = nnx.Rngs(0)
     x = jnp.zeros((1, *cfg["img_size"], 1), jnp.float32)
+    model = TinyLPR(**cfg["model"], rngs=key)
+    model = load_ckpt(model, "/Users/haoyu/Documents/Projects/LPR_Jax/weights/50")
+    model.eval()
 
-    model = TinyLPR(**cfg["model"])
-    var = model.init(key, x, train=False)
-    params = var['params']
-    batch_stats = var['batch_stats']
+    graphdef, params, other_variables = nnx.split(model, nnx.Param, ...)
+
+    class TrainState(train_state.TrainState):
+        other_variables: nnx.State
 
     state = TrainState.create(
-        apply_fn=model.apply,
+        apply_fn=graphdef.apply,
         params=params,
-        batch_stats=batch_stats,
-        tx=optax.inject_hyperparams(optax.nadam)(3e-4)
+        other_variables=other_variables,
+        tx=optax.adam(1e-3)
     )
-
-    # state = load_ckpt(state, "weights/L16_9908")
-    import orbax.checkpoint as ocp
-    manager = ocp.PyTreeCheckpointer()
-    state = manager.restore("weights/best", item=state)
 
     inout_type = tf.float32
     # inout_type = tf.uint8

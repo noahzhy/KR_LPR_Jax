@@ -60,8 +60,9 @@ def eval_step(model, batch):
 
 def eval(key, model, input_shape, ckpt_dir, test_val):
     model = load_ckpt(model, ckpt_dir)
+    model.eval()
 
-    ds, _ = get_data(test_val, batch_size=32, data_aug=False)
+    ds, _ = get_data(test_val, batch_size=2, data_aug=False)
     test_ds = tfds.as_numpy(ds)
 
     acc = []
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     model = TinyLPR(**cfg["model"], rngs=key)
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/1"
+    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/140"
 
     test_val = "data/tmp_test.tfrecord"
     acc = eval(key, model, input_shape, ckpt_dir, test_val)

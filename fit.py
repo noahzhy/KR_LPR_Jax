@@ -72,7 +72,7 @@ def train_step(model, optimizer: nnx.Optimizer, batch, loss_fn, epoch):
     return loss_dict
 
 
-def load_ckpt(model, ckpt_dir, epoch=None):
+def load_ckpt(model, ckpt_dir):
     if ckpt_dir is None or not os.path.exists(ckpt_dir):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
         return model

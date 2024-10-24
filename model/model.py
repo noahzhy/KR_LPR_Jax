@@ -62,10 +62,13 @@ class UpSample(nnx.Module):
 
     def __call__(self, x):
         x = self.bn0(self.conv0(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn1(self.conv1(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn2(self.conv2(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         return self.last_conv(x)
 
@@ -155,7 +158,6 @@ class MobileNetV3Small(nnx.Module):
     def __call__(self, x):
         # 64, 128, 1
         x = nnx.relu(self.bn0(self.conv0(x)))
-
         x = self.bneck0(x)
         x = self.bneck1(x)
         x = self.bneck2(x)
@@ -163,10 +165,6 @@ class MobileNetV3Small(nnx.Module):
         x = self.bneck4(x)
         x = self.bneck5(x)
         x = self.bneck6(x)
-
-        # for i, (k, _in, exp, out, NL, s) in enumerate(bnecks):
-        #     x = BottleNeck(_in, exp, out, s, k, NL, self.width_multiplier, self.rngs)(x)
-
         x = self.last(x)
         return x
 
@@ -256,7 +254,7 @@ class TinyLPR(nnx.Module):
 
         self.up = UpSample(time_steps, time_steps, rngs)
 
-    def __call__(self, inputs, train=True):
+    def __call__(self, inputs, train=False):
         x = self.backbone(inputs)
         mat, attn = self.attention(x)
         out = self.dense(mat)
@@ -279,6 +277,9 @@ if __name__ == '__main__':
     y = model(x)
     for i in y:
         print(i.shape)
+    
+    # print(model.tabulate(jax.random.key(0), x, compute_flops=True, compute_vjp_flops=True))
+    # quit()
 
     import orbax.checkpoint as ocp
     _, state = nnx.split(model)
