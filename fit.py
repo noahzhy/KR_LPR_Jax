@@ -76,14 +76,10 @@ def load_ckpt(model, ckpt_dir):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
         return model
 
-    ckpt_dir = os.path.abspath(ckpt_dir)
-    epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
-
     checkpointer = ocp.StandardCheckpointer()
     graphdef, abstract_state = nnx.split(model)
 
-    ckpt_path = os.path.join(ckpt_dir, str(epoch))
-    state_restored = checkpointer.restore(ckpt_path, abstract_state)
+    state_restored = checkpointer.restore(os.path.abspath(ckpt_dir), abstract_state)
     model = nnx.merge(graphdef, state_restored)
     return model
 
@@ -115,8 +111,9 @@ def fit(model,
             ## if batch is not from tfds.as_numpy, convert it to numpy
             batch = jax.tree_map(lambda x: x._numpy(), batch)
             loss_dict = train_step(model, optimizer, batch, loss_fn, epoch)
-            # lr = 0.1
-            pbar.set_description(f'Epoch {epoch:3d}, loss: {loss_dict["loss"]:.4f}')
+            lr = 0.1
+
+            pbar.set_description(f'Epoch {epoch:3d}, lr: {lr:.7f}, loss: {loss_dict["loss"]:.4f}')
 
             steps = optimizer.step.value
             if steps % 10 == 0 or steps == 1:
