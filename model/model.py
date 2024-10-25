@@ -62,10 +62,13 @@ class UpSample(nnx.Module):
 
     def __call__(self, x):
         x = self.bn0(self.conv0(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn1(self.conv1(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         x = self.bn2(self.conv2(x))
+        x = nnx.leaky_relu(x)
         x = jax.image.resize(x, shape=(x.shape[0], x.shape[1] * 2, x.shape[2] * 2, x.shape[3]), method="bilinear")
         return self.last_conv(x)
 
@@ -297,4 +300,3 @@ if __name__ == '__main__':
     y = model(x)
     for i in y:
         print(i.shape)
-    # return model

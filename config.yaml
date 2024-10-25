@@ -38,7 +38,7 @@ model:
 
 # loss config
 ctc_loss:
-  weight: 2.0
+  weight: 1.0
   blank_id: *bi
 
 # focal_ctc_loss:
