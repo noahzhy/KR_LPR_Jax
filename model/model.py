@@ -298,4 +298,3 @@ if __name__ == '__main__':
     y = model(x)
     for i in y:
         print(i.shape)
-    # return model

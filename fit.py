@@ -9,7 +9,6 @@ import optax
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
-import orbax
 # from flax.training import train_state, orbax_utils
 import tensorboardX as tbx
 
@@ -77,10 +76,13 @@ def load_ckpt(model, ckpt_dir):
         banner_message(["No checkpoint was loaded", "Training from scratch"])
         return model
 
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    epoch = epoch or max(int(f) for f in os.listdir(ckpt_dir) if f.isdigit())
+
     checkpointer = ocp.StandardCheckpointer()
     graphdef, abstract_state = nnx.split(model)
 
-    ckpt_path = os.path.abspath(ckpt_dir)
+    ckpt_path = os.path.join(ckpt_dir, str(epoch))
     state_restored = checkpointer.restore(ckpt_path, abstract_state)
     model = nnx.merge(graphdef, state_restored)
     return model
@@ -104,7 +106,7 @@ def fit(model,
     checkpointer = ocp.StandardCheckpointer()
 
     writer = tbx.SummaryWriter("logs/{}_{}".format(log_name, time.strftime("%m%d%H%M%S")))
-    best_acc = -1
+    best_acc = .0
     # start training
     for epoch in range(1, num_epochs + 1):
         model.train()
@@ -113,20 +115,20 @@ def fit(model,
             ## if batch is not from tfds.as_numpy, convert it to numpy
             batch = jax.tree_map(lambda x: x._numpy(), batch)
             loss_dict = train_step(model, optimizer, batch, loss_fn, epoch)
-            lr = 0.1
-            # print(lr)
-            pbar.set_description(f'Epoch {epoch:3d}, lr: {lr:.7f}, loss: {loss_dict["loss"]:.4f}')
+            # lr = 0.1
+            pbar.set_description(f'Epoch {epoch:3d}, loss: {loss_dict["loss"]:.4f}')
 
-            # if state.step % 10 == 0 or state.step == 1:
-            # writer.add_scalar('train/learning_rate', lr, epoch)
-            for k, v in loss_dict.items():
-                writer.add_scalar(f'train/{k}', v, epoch)
+            steps = optimizer.step.value
+            if steps % 10 == 0 or steps == 1:
+                # writer.add_scalar('train/learning_rate', lr, steps)
+                for k, v in loss_dict.items():
+                    writer.add_scalar(f'train/{k}', v, steps)
 
             writer.flush()
 
         if eval_step is None:
             _, state = nnx.split(model)
-            checkpointer.save(os.path.join(ckpt_path, str(epoch)), state)
+            checkpointer.save(os.path.join(ckpt_path, str(epoch)), state, force=True)
 
         elif epoch % eval_freq == 0:
             acc = []
@@ -138,7 +140,7 @@ def fit(model,
                 acc.append(a)
 
             acc = 0 if len(acc) == 0 else jnp.stack(acc).mean()
-            pbar.write(f'Epoch {epoch:3d}, test acc: {acc:.4f}')
+            pbar.write(f'Epoch {epoch:3d}, test acc: {acc:.6f}')
             writer.add_scalar('test/accuracy', acc, epoch)
 
             if acc > best_acc:
@@ -163,13 +165,15 @@ if __name__ == "__main__":
     def get_train_batches(batch_size=256):
         ds = tfds.load(name='mnist', split='train', as_supervised=True, shuffle_files=True)
         ds = ds.batch(batch_size).prefetch(1)
-        return tfds.as_numpy(ds)
+        # return tfds.as_numpy(ds)
+        return ds # debug for some reason, tfds.as_numpy(ds) is not working
 
 
     def get_test_batches(batch_size=256):
         ds = tfds.load(name='mnist', split='test', as_supervised=True, shuffle_files=False)
         ds = ds.batch(batch_size).prefetch(1)
-        return tfds.as_numpy(ds)
+        # return tfds.as_numpy(ds)
+        return ds
 
 
     config = {
@@ -189,20 +193,21 @@ if __name__ == "__main__":
 
     optimizer = nnx.Optimizer(model, optax.nadam(lr_fn))
 
-    # fit(model, train_ds, test_ds,
-    #     optimizer=optimizer,
-    #     loss_fn=loss_fn,
-    #     eval_step=eval_step,
-    #     eval_freq=1,
-    #     num_epochs=config['num_epochs'],
-    #     hparams=config,
-    #     log_name='mnist')
+    fit(model, train_ds, test_ds,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        eval_step=eval_step,
+        eval_freq=1,
+        num_epochs=config['num_epochs'],
+        hparams=config,
+        log_name='mnist')
 
     model = load_ckpt(model, "./checkpoints")
 
     acc = []
     model.eval()
     for batch in test_ds:
+        batch = jax.tree_map(lambda x: x._numpy(), batch)
         a = eval_step(model, batch)
         acc.append(a)
     acc = jnp.stack(acc).mean()
