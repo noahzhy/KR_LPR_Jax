@@ -2,9 +2,10 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-blue)](https://www.gnu.org/licenses/gpl-3.0.html)
 ![jax_badge][jax_badge_link] 
+![LiteRT](https://img.shields.io/badge/LiteRT-Ready-blue) 
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue)](https://huggingface.co/spaces/noahzhy/KR_LPR) 
 
-This repository is a JAX implementations of lightweight license plate recognition (LPR) models. The default weight is trained on the Korean license plate dataset and also the model can be trained on any other license plate dataset.
+This repository is a JAX implementations of lightweight South Korea license plate recognition (LPR) models. The default weight is trained on the Korean license plate dataset and also the model can be trained on any other license plate dataset.
 
 ## Demo
 Try the model on the
@@ -49,11 +50,11 @@ The losses of the model are as follows:
 
 **For CTC**:
 
-$$ L_{focal} = -\alpha_t (1 - p_t)^\gamma \log(p_t) $$
+$$ L_{ctc} = -\frac{1}{n} \sum_{i=1}^{n} \log(p_{i}) $$
 
 $$ L_{center} = \sum_{i=1}^{n} \left(1 - \frac{c_i}{t}\right)^2 $$
 
-$$ L_{CTC} = \alpha * L_{focal} + \beta * L_{center} = 
+$$ L_{Total} = \alpha * L_{ctc} + \beta * L_{center} = 
 \begin{cases}
   \begin{aligned}
     0,            \quad\text{if } t \leq 20k    \\
@@ -71,7 +72,7 @@ $$
 
 | Model   | Input Shape  | Size  | Accuracy | Speed (ms) |
 | ------- | ------------ | ----- | -------- | ---------: |
-| tinyLPR | (96, 192, 1) | 86 KB | 99.08 %  |    0.44 ms |
+| tinyLPR | (96, 192, 1) | 86 KB | 99.12 %  |    0.42 ms |
 
 The speed is tested on the Apple M2 chip.
 

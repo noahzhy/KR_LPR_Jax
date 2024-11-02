@@ -31,24 +31,13 @@ class RepresentativeDataset:
             yield [img]
 
 
-def jax2tflite(key, state, input_shape, dataset, save_path='model.tflite',
+def jax2tflite(key, model, input_shape, dataset, save_path='model.tflite',
                inference_input_type=tf.uint8,
                inference_output_type=tf.uint8):
 
-    def predict(input_img):
-        return state.apply_fn(params, other_variables)(input_img)[0]
-
-    tf_predict = tf.function(
-        jax2tf.convert(predict, enable_xla=False),
-        input_signature=[
-            tf.TensorSpec(
-                shape=list(input_shape),
-                dtype=tf.float32,
-                name='input_image')],
-        autograph=False)
-
-    converter = tf.lite.TFLiteConverter.from_concrete_functions(
-        [tf_predict.get_concrete_function()], tf_predict)
+    x_input = jnp.zeros(input_shape, jnp.float32)
+    converter = tf.lite.TFLiteConverter.experimental_from_jax(
+        [model], [[('input', x_input)]])
 
     converter.allow_custom_ops = True
     converter.experimental_new_converter = True
@@ -79,8 +68,7 @@ def jax2tflite(key, state, input_shape, dataset, save_path='model.tflite',
 
 def load_ckpt(model, ckpt_dir):
     if ckpt_dir is None or not os.path.exists(ckpt_dir):
-        banner_message(["No checkpoint was loaded", "Training from scratch"])
-        return model
+        raise FileNotFoundError("No checkpoint was loaded")
 
     import orbax.checkpoint as ocp
     checkpointer = ocp.StandardCheckpointer()
@@ -112,22 +100,10 @@ if __name__ == "__main__":
     model = load_ckpt(model, "/Users/haoyu/Documents/Projects/LPR_Jax/weights/175")
     model.eval()
 
-    graphdef, params, other_variables = nnx.split(model, nnx.Param, ...)
-
-    class TrainState(train_state.TrainState):
-        other_variables: nnx.State
-
-    state = TrainState.create(
-        apply_fn=graphdef.apply,
-        params=params,
-        other_variables=other_variables,
-        tx=optax.adam(1e-3)
-    )
-
     inout_type = tf.float32
     # inout_type = tf.uint8
 
-    jax2tflite(key, state, IMG_SIZE, val_ds,
+    jax2tflite(key, model, IMG_SIZE, val_ds,
                save_path='model.tflite',
                inference_input_type=inout_type,
                inference_output_type=inout_type)

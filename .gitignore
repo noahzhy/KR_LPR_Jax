@@ -11,6 +11,7 @@ model.tflite
 tmp*
 
 !demo/*
+!weights/175
 
 
 # Byte-compiled / optimized / DLL files

@@ -264,7 +264,8 @@ class TinyLPR(nnx.Module):
             attn = self.up(attn)
             return attn, mat, out
 
-        # out = nnx.log_softmax(out)
+        ## out = nnx.log_softmax(out) ## this make exported model strucutre more complex
+        out = jnp.log(nnx.softmax(out)) ## same but simpler, only for inference and export
         return out
 
 
@@ -273,27 +274,6 @@ if __name__ == '__main__':
     jax.config.update("jax_platform_name", "cpu")
     key = nnx.Rngs(0)
     model = TinyLPR(time_steps=16, n_class=68, n_feat=64, rngs=key)
-    x = jnp.zeros((1, 96, 192, 1))
-    y = model(x)
-    for i in y:
-        print(i.shape)
-    
-    # print(model.tabulate(jax.random.key(0), x, compute_flops=True, compute_vjp_flops=True))
-    # quit()
-
-    import orbax.checkpoint as ocp
-    _, state = nnx.split(model)
-
-    checkpointer = ocp.StandardCheckpointer()
-    ckpt_path = "/Users/haoyu/Documents/Projects/LPR_Jax/checkpoints/"
-    checkpointer.save(ckpt_path, state, force=True)
-
-    # ckpt_path = os.path.join(ckpt_path, str(epoch))
-    # model = nnx.eval_shape(lambda: Model(nnx.Rngs(0)))
-    graphdef, abstract_state = nnx.split(model)
-
-    state_restored = checkpointer.restore(ckpt_path, abstract_state)
-    model = nnx.merge(graphdef, state_restored)
     x = jnp.zeros((1, 96, 192, 1))
     y = model(x)
     for i in y:
