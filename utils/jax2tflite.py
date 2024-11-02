@@ -102,17 +102,14 @@ if __name__ == "__main__":
     import yaml
     import optax
     from flax.training import train_state
-
-
     sys.path.append("../")
-    # from fit import TrainState, load_ckpt
 
     cfg = yaml.safe_load(open("config.yaml"))
 
     key = nnx.Rngs(0)
     x = jnp.zeros((1, *cfg["img_size"], 1), jnp.float32)
     model = TinyLPR(**cfg["model"], rngs=key)
-    model = load_ckpt(model, "/Users/haoyu/Documents/Projects/LPR_Jax/weights/50")
+    model = load_ckpt(model, "/Users/haoyu/Documents/Projects/LPR_Jax/weights/175")
     model.eval()
 
     graphdef, params, other_variables = nnx.split(model, nnx.Param, ...)

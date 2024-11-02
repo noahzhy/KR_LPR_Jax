@@ -109,11 +109,12 @@ if __name__ == '__main__':
     # init and load model
     demo = TFliteDemo('model.tflite', size=img_size)
 
+    random.seed(0)
     # get random image
-    val_path = "/Users/haoyu/Documents/datasets/lpr/val"
-    # random seed
-    random.seed(1)
-    img_list = random.sample(glob.glob(os.path.join(val_path, '*.jpg')), num_samples)
+    val_path = "/Users/haoyu/Documents/datasets/lpr/test"
+    # img_list = random.sample(glob.glob(os.path.join(val_path, '*.jpg')), num_samples)
+    # list all file
+    img_list = glob.glob(os.path.join(val_path, '*.jpg'))
 
     res_confs = []
 

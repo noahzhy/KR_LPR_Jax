@@ -2,18 +2,13 @@ import glob, random, time
 from itertools import groupby
 
 import jax
-# cpu mode
-jax.config.update('jax_platform_name', 'cpu')
+# # cpu mode
+# jax.config.update('jax_platform_name', 'cpu')
 import yaml
 import optax
 import jax.numpy as jnp
 import tensorflow as tf
 import orbax.checkpoint as ocp
-
-# # check obarx version
-# print(ocp.__version__)
-# quit()
-
 import matplotlib.pyplot as plt
 from jamo import h2j, j2hcj, j2h
 import tensorflow_datasets as tfds
@@ -62,11 +57,13 @@ def eval(key, model, input_shape, ckpt_dir, test_val):
     model = load_ckpt(model, ckpt_dir)
     model.eval()
 
-    ds, _ = get_data(test_val, batch_size=2, data_aug=False)
+    ds, _ = get_data(test_val, batch_size=128, data_aug=False)
     test_ds = tfds.as_numpy(ds)
 
+    from tqdm import tqdm
+
     acc = []
-    for batch in test_ds:
+    for batch in tqdm(test_ds):
         a = eval_step(model, batch)
         acc.append(a)
 
@@ -121,15 +118,15 @@ def single_test(key, model, input_shape, ckpt_dir, image_path):
 
 if __name__ == "__main__":
     # cpu mode
-    jax.config.update('jax_platform_name', 'cpu')
+    # jax.config.update('jax_platform_name', 'cpu')
     cfg = yaml.safe_load(open("config.yaml"))
     key = nnx.Rngs(0)
     model = TinyLPR(**cfg["model"], rngs=key)
 
     input_shape = (1, *cfg["img_size"], 1)
-    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/140"
+    ckpt_dir = "/Users/haoyu/Documents/Projects/LPR_Jax/weights/175"
 
-    test_val = "data/tmp_test.tfrecord"
+    test_val = "data/test.tfrecord"
     acc = eval(key, model, input_shape, ckpt_dir, test_val)
     print("\33[32mAvg acc: {:.4f}\33[00m".format(acc))
 
