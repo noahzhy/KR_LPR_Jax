@@ -254,7 +254,7 @@ class TinyLPR(nnx.Module):
 
         self.up = UpSample(time_steps, time_steps, rngs)
 
-    def __call__(self, inputs, train=False):
+    def __call__(self, inputs, train=True):
         x = self.backbone(inputs)
         mat, attn = self.attention(x)
         out = self.dense(mat)

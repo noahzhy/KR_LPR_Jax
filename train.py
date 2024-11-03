@@ -31,12 +31,13 @@ lr_fn = lr_schedule(cfg["lr"], train_len, cfg["epochs"], cfg["warmup"])
 
 @nnx.jit
 def loss_fn(pred, target, epoch=None):
-    pred_mask, pred_feat, pred_ctc = pred
+    pred_mask, pred_feat, pred_ce = pred
     mask, label = target
 
-    loss_ctc = ctc_loss(pred_ctc, label, **cfg["ctc_loss"]).mean()
+    # loss_ctc = ctc_loss(pred_ctc, label, **cfg["ctc_loss"]).mean()
+    loss_ce = ce_loss(pred_ce, label)
     loss_mask = tversky_loss(pred_mask, mask)
-    loss_center = center_ctc_loss((pred_feat, pred_ctc), **cfg["center_ctc_loss"])
+    loss_center = center_ctc_loss((pred_feat, pred_ce), **cfg["center_ctc_loss"])
 
     loss_center = jax.lax.cond(
         epoch <= 20,
@@ -45,13 +46,13 @@ def loss_fn(pred, target, epoch=None):
         None
     )
 
-    loss = (cfg["ctc_loss"]["weight"] * loss_ctc +
+    loss = (cfg["ctc_loss"]["weight"] * loss_ce +
             cfg["dice_bce_loss"]["weight"]  * loss_mask +
             cfg["center_ctc_loss"]["weight"]* loss_center)
 
     loss_dict = {
         'loss': loss,
-        'loss_ctc': loss_ctc,
+        'loss_ce': loss_ce,
         'loss_mask': loss_mask,
         'loss_center': loss_center,
     }
@@ -68,12 +69,9 @@ def predict(model, batch):
 @nnx.jit
 def eval_step(model, batch):
     pred_ctc, label = predict(model, batch)
-    pred = batch_ctc_greedy_decoder(pred_ctc)
-    # replace -1 with 0 in label and pred
-    pred = jnp.where(pred == -1, 0, pred)
-    label = jnp.where(label == -1, 0, label)
-    ans = batch_array_comparison(pred, label, size=cfg["time_steps"]+1)
-    return jnp.mean(ans)
+    pred = jnp.argmax(pred_ctc, axis=-1)
+    acc = jnp.mean(jnp.equal(pred, label))
+    return acc
 
 
 if __name__ == "__main__":
@@ -81,7 +79,8 @@ if __name__ == "__main__":
     x = jnp.zeros((1, *cfg["img_size"], 1))
 
     model = TinyLPR(**cfg["model"], rngs=key)
-    optimizer = nnx.Optimizer(model, optax.nadam(lr_fn))
+    tx = optax.inject_hyperparams(optax.nadam)(lr_fn)
+    optimizer = nnx.Optimizer(model, tx)
 
     # state = load_ckpt(state, cfg["ckpt"])
 

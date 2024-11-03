@@ -1,7 +1,7 @@
 # This is a config file for the license plate recognition task
 img_size: &im [96, 192]
-time_steps: &ts 16
-blank_id: &bi -1
+time_steps: &ts 8
+blank_id: &bi 0
 
 # training config
 ckpt: ""
@@ -23,11 +23,13 @@ eval_freq: 5
 train:
   batch_size: *bs
   tfrecord: "/home/ubuntu/datasets/lpr/train.tfrecord"
+  # tfrecord: /Users/haoyu/Documents/Projects/LPR_Jax/data/tmp_test.tfrecord
   data_aug: True
 
 val:
   batch_size: *bs
   tfrecord: "/home/ubuntu/datasets/lpr/val.tfrecord"
+  # tfrecord: /Users/haoyu/Documents/Projects/LPR_Jax/data/tmp_test.tfrecord
   data_aug: False
 
 # model config

@@ -24,11 +24,7 @@ def gen_mask(bbox, size, len_label, time_step=TIME_STEPS):
         b1 = max(0, box[1])
         b2 = min(w, box[2])
         b3 = min(h, box[3])
-        # mask[b1:b3, b0:b2, i] = 1
-        mask[b1:b3, b0:b2, time_step-(2*(len_label-i)-1)] = 1
-
-        # hmap = draw_heatmaps((1, h, w, 1), [[box]])
-        # mask[:, :, time_step-(2*(len_label-i)-1)] = hmap[:, :, :, 0]
+        mask[b1:b3, b0:b2, time_step-(len_label-i)] = 1
 
     return mask
 
@@ -92,7 +88,7 @@ def gen_tfrecord(dir_path, file_name):
         # # img.show()
         # # save the image
         # image.save('test.jpg')
-        # quit()
+        # # quit()
 
         image = np.array(image, dtype=np.uint8).tobytes()
         mask = np.array(mask, dtype=np.int32).tobytes()

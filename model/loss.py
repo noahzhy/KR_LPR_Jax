@@ -8,6 +8,29 @@ import jax.numpy as jnp
 
 
 @jax.jit
+def ce_loss(logits, targets):
+    # logits: (N, T, C), targets: (N, T)
+    preds = logits.reshape(-1, logits.shape[-1])
+    labels = targets.reshape(-1)
+    return optax.softmax_cross_entropy(preds, jax.nn.one_hot(labels, logits.shape[-1])).mean()
+
+
+# test
+def ce_loss_test():
+    import numpy as np
+    logits = np.random.randn(2, 4, 16).astype(np.float32)
+    targets = np.random.randint(0, 4, (2, 4)).astype(np.int32)
+    start_t = perf_counter()
+    for i in range(1000):
+        loss = ce_loss(logits, targets)
+    end_t = perf_counter()
+    avg_time = (end_t - start_t) / 1000
+    print('\33[92m[pass]\33[00m ce_loss() test passed.')
+    print('  - loss:', loss)
+    print('  - time: {:.6f} ms'.format(avg_time*1000))
+
+
+@jax.jit
 def focal_tversky_loss(logits, targets, gamma=0.75):
     loss_fn = tversky_loss(logits, targets)
     return jnp.power(1 - loss_fn, gamma)
@@ -184,3 +207,4 @@ if __name__ == "__main__":
     focal_ctc_loss_test()
     center_ctc_loss_test()
     smooth_l1_loss_test()
+    ce_loss_test()

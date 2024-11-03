@@ -58,7 +58,7 @@ def align_label(label, time_step=TIME_STEPS):
             aligned_label = tf.pad(aligned_label, [[time_step - 1 - len(aligned_label), 1]], 'CONSTANT')
             aligned_label = tf.tensor_scatter_nd_update(aligned_label, [[time_step - 1]], [-1])
         return aligned_label
-    return tf.pad(label, [[0, time_step - len(label)]], 'CONSTANT')
+    return tf.pad(label, [[time_step - len(label), 0]], 'CONSTANT')
 
 
 def pad_image_mask(image, mask, label, time_step=TIME_STEPS, target_size=TARGET_SIZE):
@@ -134,10 +134,10 @@ if __name__ == "__main__":
     from PIL import Image
     import tensorflow_datasets as tfds
 
-    batch_size = 8
-    time_steps = 16
+    batch_size = 2
+    time_steps = 8
     aug = False
-    BLANK_ID = -1
+    BLANK_ID = 0
 
     # load dict from names file to dict
     with open("data/labels.names", "r") as f:
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         img = Image.fromarray(np.uint8(img))
         img.save('test.jpg')
 
-        for i in range(16):
+        for i in range(8):
             # save as i.png
             mask_ = mask[0][:, :, i] * 255
             mask_ = Image.fromarray(np.uint8(mask_))
